@@ -1,0 +1,408 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { TRILHAS } from '../data/pautas';
+import { fetchPublishedPautas } from '../lib/supabase';
+
+const allPautas = await fetchPublishedPautas();
+const heroPauta = allPautas.find((p) => p.destaque) ?? allPautas[0];
+const remaining = allPautas.filter((p) => p.slug !== heroPauta.slug);
+const featuredPair = remaining.slice(0, 2);
+const featuredTrio = remaining.slice(2, 5);
+
+Astro.response.headers.set(
+  'Cache-Control',
+  'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+);
+
+const formatFullDate = (iso: string) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso));
+
+const homeJsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://olhapauta.com.br/#organization',
+      name: 'OlhaPauta',
+      url: 'https://olhapauta.com.br',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olhapauta.com.br/images/logo-olhapauta.webp',
+        width: 377,
+        height: 59,
+      },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://olhapauta.com.br/#website',
+      url: 'https://olhapauta.com.br',
+      name: 'OlhaPauta',
+      inLanguage: 'pt-BR',
+      publisher: { '@id': 'https://olhapauta.com.br/#organization' },
+    },
+    {
+      '@type': 'ItemList',
+      name: 'Últimas pautas do OlhaPauta',
+      itemListElement: allPautas.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `https://olhapauta.com.br/pauta/${p.slug}`,
+        name: p.titulo,
+      })),
+    },
+  ],
+};
+---
+
+<BaseLayout
+  title="OlhaPauta | Inteligência Artificial, Tecnologia e Negócios"
+  description="Publicação editorial sobre Inteligência Artificial, Tecnologia, Segurança, Negócios e Guias práticos com leitura limpa e organizada."
+  ogImage={heroPauta.imagem.url}
+  canonicalPath="/"
+  jsonLd={homeJsonLd}
+>
+  <!-- Apple Newsroom Style Canvas (#F5F5F7 light / #0C0D10 dark with elevated crisp cards) -->
+  <div class="bg-[var(--color-surface)] dark:bg-[#0D0E11] transition-colors duration-200">
+    <section class="mx-auto max-w-[980px] px-5 pt-10 pb-16 sm:pt-14 sm:pb-20">
+      <h1 class="text-[28px] sm:text-[32px] font-bold tracking-[-0.028em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] mb-7">
+        Últimas pautas<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+      </h1>
+
+      <!-- Row 1: Full-width Horizontal Hero Card (Apple Newsroom Signature) -->
+      <article class="group overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+        <a
+          href={`/pauta/${heroPauta.slug}`}
+          data-astro-prefetch="viewport"
+          class="grid lg:grid-cols-12 focus:outline-none"
+        >
+          <div class="lg:col-span-7 overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+            <img
+              src={heroPauta.imagem.url}
+              alt={heroPauta.imagem.alt}
+              width="1600"
+              height="900"
+              fetchpriority="high"
+              decoding="async"
+              class="h-full w-full aspect-[16/10] lg:aspect-auto object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            />
+          </div>
+
+          <div class="lg:col-span-5 flex flex-col justify-between p-7 sm:p-9">
+            <div>
+              <span class="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                {heroPauta.trilhaLabel}
+              </span>
+
+              <h2 class="mt-2.5 text-[24px] sm:text-[28px] font-bold leading-[1.15] tracking-[-0.028em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                {heroPauta.titulo}
+              </h2>
+
+              <p class="mt-3.5 text-[15px] leading-[1.55] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] line-clamp-3">
+                {heroPauta.resumoCurto}
+              </p>
+            </div>
+
+            <div class="mt-7 flex items-center justify-between text-[13px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+              <time datetime={heroPauta.dataISO}>{formatFullDate(heroPauta.dataISO)}</time>
+              <span>{heroPauta.tempoLeitura.toLowerCase()}</span>
+            </div>
+          </div>
+        </a>
+      </article>
+
+      <!-- Row 2: Two Medium Cards Side-by-Side -->
+      <div class="mt-7 grid gap-7 md:grid-cols-2">
+        {featuredPair.map((pauta) => (
+          <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+            <a
+              href={`/pauta/${pauta.slug}`}
+              data-astro-prefetch="viewport"
+              class="flex flex-1 flex-col focus:outline-none"
+            >
+              <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+                <img
+                  src={pauta.imagem.url}
+                  alt={pauta.imagem.alt}
+                  width="1200"
+                  height="675"
+                  loading="lazy"
+                  decoding="async"
+                  class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                />
+              </div>
+
+              <div class="flex flex-1 flex-col justify-between p-7">
+                <div>
+                  <span class="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                    {pauta.trilhaLabel}
+                  </span>
+
+                  <h2 class="mt-2 text-[21px] sm:text-[23px] font-bold leading-[1.2] tracking-[-0.022em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                    {pauta.titulo}
+                  </h2>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between text-[13px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
+                  <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                </div>
+              </div>
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <!-- Row 3: Three Compact Cards -->
+      <div class="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+        {featuredTrio.map((pauta) => (
+          <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+            <a
+              href={`/pauta/${pauta.slug}`}
+              data-astro-prefetch="viewport"
+              class="flex flex-1 flex-col focus:outline-none"
+            >
+              <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+                <img
+                  src={pauta.imagem.url}
+                  alt={pauta.imagem.alt}
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                  class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                />
+              </div>
+
+              <div class="flex flex-1 flex-col justify-between p-6">
+                <div>
+                  <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                    {pauta.trilhaLabel}
+                  </span>
+
+                  <h2 class="mt-2 text-[18px] font-bold leading-[1.25] tracking-[-0.018em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                    {pauta.titulo}
+                  </h2>
+                </div>
+
+                <div class="mt-5 flex items-center justify-between text-[12px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
+                  <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                </div>
+              </div>
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
+  </div>
+
+  <!-- Section 2: "Mais do OlhaPauta" (Apple Newsroom Archive Grid with Trail Filter + SEO Internal Links) -->
+  <section id="indice" class="mx-auto max-w-[980px] px-5 pt-16 pb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pb-5">
+      <h2 class="text-[24px] sm:text-[28px] font-bold tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+        Mais do OlhaPauta<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+      </h2>
+
+      <!-- Filter Pills -->
+      <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar pautas por trilha">
+        <button
+          type="button"
+          data-filter="all"
+          class="filter-btn active rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors cursor-pointer bg-[var(--color-ink)] text-[var(--color-paper)] border-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] dark:text-[var(--color-dark-paper)] dark:border-[var(--color-dark-ink)]"
+        >
+          Todas
+        </button>
+        {TRILHAS.map((trilha) => (
+          <button
+            type="button"
+            id={`trilha-${trilha.slug}`}
+            data-filter={trilha.slug}
+            class="filter-btn rounded-full px-3.5 py-1.5 text-xs font-medium border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors cursor-pointer"
+          >
+            {trilha.nome}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    <!-- Compact 2-Column List (Apple Newsroom "More from Newsroom" style) -->
+    <div class="mt-2 grid gap-x-10 md:grid-cols-2 divide-y divide-[var(--color-rule)] dark:divide-[var(--color-dark-rule)] md:divide-y-0">
+      {allPautas.map((pauta) => (
+        <article
+          data-trilha={pauta.trilha}
+          class="pauta-row group py-6 md:border-b md:border-[var(--color-rule)] md:dark:border-[var(--color-dark-rule)]"
+        >
+          <a
+            href={`/pauta/${pauta.slug}`}
+            data-astro-prefetch="viewport"
+            class="flex items-start gap-4 focus:outline-none"
+          >
+            <div class="h-[88px] w-[124px] shrink-0 overflow-hidden rounded-xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)]">
+              <img
+                src={pauta.imagem.url}
+                alt={pauta.imagem.alt}
+                width="248"
+                height="176"
+                loading="lazy"
+                decoding="async"
+                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+              />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                {pauta.trilhaLabel}
+              </span>
+              <h3 class="mt-1 text-[15px] sm:text-[16px] font-semibold leading-[1.3] tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] group-hover:opacity-75 transition-opacity line-clamp-2">
+                {pauta.titulo}
+              </h3>
+              <p class="mt-2 text-[12px] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                {formatFullDate(pauta.dataISO)}
+              </p>
+            </div>
+          </a>
+        </article>
+      ))}
+    </div>
+
+    <!-- Pagination CTA with Signature Animated Red Dot -->
+    <div class="mt-10 flex items-center justify-center">
+      <a
+        href="/pagina/2"
+        data-astro-prefetch="viewport"
+        class="group inline-flex items-center gap-3 rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-6 py-3 text-[13px] font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity"
+      >
+        <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+        <span>Ver mais pautas</span>
+        <span class="text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] transition-transform group-hover:translate-x-1">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Section 3: Clean Newsletter Band -->
+  <section class="mx-auto max-w-[980px] px-5 pt-12">
+    <div class="rounded-[20px] bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-7 sm:p-10">
+      <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
+        <div class="lg:col-span-7">
+          <h2 class="text-[22px] sm:text-[26px] font-bold tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            Receba as pautas de IA que realmente importam<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+          </h2>
+          <p class="mt-2.5 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+            Um resumo semanal direto com análises, modelos e ferramentas práticas, escrito para ser lido em 3 minutos.
+          </p>
+        </div>
+
+        <form id="newsletter-form" class="lg:col-span-5 flex flex-col gap-2">
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <label for="newsletter-email" class="sr-only">Seu e-mail</label>
+            <input
+              id="newsletter-email"
+              name="email"
+              type="email"
+              required
+              placeholder="voce@exemplo.com"
+              class="flex-1 rounded-full border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)] dark:bg-[var(--color-dark-paper)] px-4 py-2.5 text-sm text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] placeholder:text-[var(--color-ink-subtle)] focus:border-[var(--color-ink)] dark:focus:border-[var(--color-dark-ink)] focus:outline-none"
+            />
+            <button
+              id="newsletter-submit"
+              type="submit"
+              class="rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] px-5 py-2.5 text-sm font-medium text-[var(--color-paper)] dark:text-[var(--color-dark-paper)] hover:opacity-85 transition-opacity cursor-pointer whitespace-nowrap"
+            >
+              Assinar
+            </button>
+          </div>
+          <p id="newsletter-feedback" class="hidden text-xs text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] pl-2" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    document.addEventListener('astro:page-load', () => {
+      const buttons = document.querySelectorAll('.filter-btn');
+      const rows = document.querySelectorAll('.pauta-row');
+      if (!buttons.length) return;
+
+      const activeClasses = [
+        'bg-[var(--color-ink)]',
+        'text-[var(--color-paper)]',
+        'border-[var(--color-ink)]',
+        'dark:bg-[var(--color-dark-ink)]',
+        'dark:text-[var(--color-dark-paper)]',
+        'dark:border-[var(--color-dark-ink)]',
+      ];
+
+      const inactiveClasses = [
+        'border-[var(--color-rule)]',
+        'dark:border-[var(--color-dark-rule)]',
+        'text-[var(--color-ink-muted)]',
+        'dark:text-[var(--color-dark-muted)]',
+      ];
+
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const filter = btn.getAttribute('data-filter');
+
+          buttons.forEach((b) => {
+            b.classList.remove(...activeClasses);
+            b.classList.add(...inactiveClasses);
+          });
+          btn.classList.remove(...inactiveClasses);
+          btn.classList.add(...activeClasses);
+
+          rows.forEach((row) => {
+            const trilha = row.getAttribute('data-trilha');
+            if (filter === 'all' || trilha === filter) {
+              row.classList.remove('hidden');
+            } else {
+              row.classList.add('hidden');
+            }
+          });
+        });
+      });
+
+      const nlForm = document.getElementById('newsletter-form');
+      if (nlForm && !nlForm.dataset.bound) {
+        nlForm.dataset.bound = '1';
+        nlForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const emailInput = document.getElementById('newsletter-email');
+          const submitBtn = document.getElementById('newsletter-submit');
+          const feedback = document.getElementById('newsletter-feedback');
+          const email = emailInput?.value?.trim();
+          if (!email || !submitBtn) return;
+
+          submitBtn.textContent = 'Salvando…';
+          submitBtn.disabled = true;
+
+          try {
+            const res = await fetch('/api/newsletter', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            });
+            const data = await res.json();
+            if (feedback) {
+              feedback.textContent = data.message || 'Inscrito com sucesso.';
+              feedback.classList.remove('hidden');
+            }
+            if (data.ok) {
+              submitBtn.textContent = 'Inscrito ✓';
+              if (emailInput) emailInput.value = '';
+            } else {
+              submitBtn.textContent = 'Assinar';
+              submitBtn.disabled = false;
+            }
+          } catch {
+            submitBtn.textContent = 'Assinar';
+            submitBtn.disabled = false;
+          }
+        });
+      }
+    });
+  </script>
+</BaseLayout>

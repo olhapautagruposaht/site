@@ -1,0 +1,63 @@
+---
+// Minimal Apple-like LGPD Cookie Consent Banner (non-intrusive, zero CLS)
+---
+
+<div
+  id="op-cookie-banner"
+  role="dialog"
+  aria-label="Preferências de cookies"
+  class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:max-w-sm z-40 hidden rounded-2xl border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)]/95 dark:bg-[var(--color-dark-surface)]/95 p-4 shadow-xl backdrop-blur-xl"
+>
+  <p class="text-[13px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+    Usamos cookies para melhorar sua leitura, medir audiência e exibir anúncios relevantes conforme nossa{' '}
+    <a href="/politica-de-privacidade" class="underline underline-offset-2 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+      Política de Privacidade
+    </a>.
+  </p>
+  <div class="mt-3.5 flex items-center justify-end gap-2">
+    <button
+      id="op-cookie-essential"
+      type="button"
+      class="rounded-full px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors cursor-pointer"
+    >
+      Apenas essenciais
+    </button>
+    <button
+      id="op-cookie-accept"
+      type="button"
+      class="rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] px-4 py-1.5 text-[12px] font-medium text-[var(--color-paper)] dark:text-[var(--color-dark-paper)] hover:opacity-85 transition-opacity cursor-pointer"
+    >
+      Aceitar
+    </button>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('astro:page-load', () => {
+    const banner = document.getElementById('op-cookie-banner');
+    if (!banner) return;
+
+    const consent = localStorage.getItem('op-cookie-consent');
+    if (!consent) {
+      banner.classList.remove('hidden');
+    }
+
+    const saveConsent = (value) => {
+      localStorage.setItem('op-cookie-consent', value);
+      banner.classList.add('hidden');
+      window.dispatchEvent(new CustomEvent('op:consent', { detail: value }));
+    };
+
+    const acceptBtn = document.getElementById('op-cookie-accept');
+    const essentialBtn = document.getElementById('op-cookie-essential');
+
+    if (acceptBtn && !acceptBtn.dataset.bound) {
+      acceptBtn.dataset.bound = '1';
+      acceptBtn.addEventListener('click', () => saveConsent('all'));
+    }
+    if (essentialBtn && !essentialBtn.dataset.bound) {
+      essentialBtn.dataset.bound = '1';
+      essentialBtn.addEventListener('click', () => saveConsent('essential'));
+    }
+  });
+</script>

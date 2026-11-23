@@ -1,0 +1,51 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Contato | OlhaPauta"
+  description="Entre em contato com a equipe editorial do OlhaPauta para sugestões de pauta, correções ou parcerias."
+  canonicalPath="/contato"
+>
+  <article class="mx-auto max-w-[650px] px-5 pt-14 pb-8">
+    <h1 class="text-[36px] sm:text-[44px] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+      Contato<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+    </h1>
+
+    <p class="mt-5 text-[19px] leading-[1.5] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+      Sugestões de pauta, correções técnicas, imprensa ou parcerias comerciais.
+    </p>
+
+    <div class="mt-10 grid gap-4 sm:grid-cols-2">
+      <div class="rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6">
+        <p class="text-xs font-semibold text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+          Redação & Pautas
+        </p>
+        <a
+          href="mailto:redacao@olhapauta.com.br"
+          class="mt-2 block text-base font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-75 transition-opacity"
+        >
+          redacao@olhapauta.com.br
+        </a>
+        <p class="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+          Envio de sugestões, estudos, lançamentos de IA e pedidos de correção.
+        </p>
+      </div>
+
+      <div class="rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6">
+        <p class="text-xs font-semibold text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+          Comercial & Parcerias
+        </p>
+        <a
+          href="mailto:contato@olhapauta.com.br"
+          class="mt-2 block text-base font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-75 transition-opacity"
+        >
+          contato@olhapauta.com.br
+        </a>
+        <p class="mt-2 text-xs leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+          Publicidade, patrocínios de newsletter e solicitações de privacidade (LGPD).
+        </p>
+      </div>
+    </div>
+  </article>
+</BaseLayout>

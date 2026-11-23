@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Página não encontrada | OlhaPauta"
+  description="A pauta ou página que você procura não foi encontrada no OlhaPauta."
+  canonicalPath="/404"
+>
+  <section class="mx-auto max-w-[650px] px-5 py-24 text-center">
+    <p class="text-sm font-semibold text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">404</p>
+    <h1 class="mt-2 text-3xl sm:text-4xl font-bold tracking-[-0.03em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+      Pauta não encontrada<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+    </h1>
+    <p class="mt-4 text-base text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+      O endereço pode ter mudado ou o conteúdo foi arquivado. Volte para a página inicial para explorar as pautas recentes de IA.
+    </p>
+    <div class="mt-8">
+      <a
+        href="/"
+        class="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] px-6 py-2.5 text-sm font-medium text-[var(--color-paper)] dark:text-[var(--color-dark-paper)] hover:opacity-85 transition-opacity"
+      >
+        Voltar ao início
+      </a>
+    </div>
+  </section>
+</BaseLayout>

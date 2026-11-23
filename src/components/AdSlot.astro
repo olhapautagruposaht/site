@@ -1,0 +1,39 @@
+---
+interface Props {
+  slotName: string;
+  format?: 'in-article' | 'display' | 'multiplex';
+  minHeight?: string;
+}
+
+const { slotName, format = 'in-article', minHeight = 'min-h-[250px]' } = Astro.props;
+const isDev = import.meta.env.DEV;
+---
+
+<aside
+  aria-label="Publicidade"
+  data-ad-slot={slotName}
+  data-ad-format={format}
+  class="my-10 flex flex-col items-center justify-center"
+>
+  <span class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+    Publicidade
+  </span>
+  <div
+    class={`w-full ${minHeight} rounded-2xl border border-dashed border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-surface)]/70 dark:bg-[var(--color-dark-surface)]/70 flex flex-col items-center justify-center px-4 text-center`}
+  >
+    {isDev ? (
+      <div class="text-xs text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+        <p class="font-medium">AdSense Slot · {slotName}</p>
+        <p class="mt-1 text-[11px] opacity-75">Altura reservada ({minHeight}) · CLS = 0</p>
+      </div>
+    ) : (
+      <ins
+        class="adsbygoogle block w-full"
+        style="display:block; text-align:center;"
+        data-ad-layout={format === 'in-article' ? 'in-article' : undefined}
+        data-ad-format={format === 'in-article' ? 'fluid' : 'auto'}
+        data-full-width-responsive="true"
+      />
+    )}
+  </div>
+</aside>

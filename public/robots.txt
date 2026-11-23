@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# AI Search & GEO Crawlers (allowed for citation & visibility)
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://olhapauta.com.br/sitemap.xml

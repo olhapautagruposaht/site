@@ -1,0 +1,206 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { TRILHAS } from '../../data/pautas';
+import { fetchPublishedPautas } from '../../lib/supabase';
+
+const currentPage = Math.max(1, Number(Astro.params.page ?? 2));
+if (Number.isNaN(currentPage) || currentPage === 1) {
+  return Astro.redirect('/', 301);
+}
+
+const allPautas = await fetchPublishedPautas();
+const perPage = 12;
+const totalPages = Math.max(2, Math.ceil(allPautas.length / perPage));
+const start = (currentPage - 1) * perPage;
+const slice = allPautas.slice(start, start + perPage);
+const pagePautas = slice.length > 0 ? slice : [...allPautas].reverse();
+
+Astro.response.headers.set(
+  'Cache-Control',
+  'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+);
+
+const formatFullDate = (iso: string) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso));
+---
+
+<BaseLayout
+  title={`Pautas de IA | Página ${currentPage} | OlhaPauta`}
+  description="Arquivo completo de análises, modelos, agentes e guias práticos sobre Inteligência Artificial no OlhaPauta."
+  canonicalPath={`/pagina/${currentPage}`}
+>
+  <div class="bg-[var(--color-surface)] dark:bg-[#0D0E11] transition-colors duration-200">
+    <section class="mx-auto max-w-[980px] px-5 pt-10 pb-16 sm:pt-14 sm:pb-20">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <div>
+          <a
+            href="/"
+            class="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors mb-3"
+          >
+            <span>←</span>
+            <span>Voltar para a capa</span>
+          </a>
+          <h1 class="text-[28px] sm:text-[34px] font-bold tracking-[-0.028em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            Arquivo de pautas<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+          </h1>
+        </div>
+
+        <p class="text-[13px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] tabular-nums">
+          Página {currentPage} de {totalPages}
+        </p>
+      </div>
+
+      <!-- Filter Pills -->
+      <div class="flex flex-wrap gap-1.5 mb-8" role="tablist" aria-label="Filtrar pautas por trilha">
+        <button
+          type="button"
+          data-filter="all"
+          class="filter-btn active rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors cursor-pointer bg-[var(--color-ink)] text-[var(--color-paper)] border-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] dark:text-[var(--color-dark-paper)] dark:border-[var(--color-dark-ink)]"
+        >
+          Todas
+        </button>
+        {TRILHAS.map((trilha) => (
+          <button
+            type="button"
+            data-filter={trilha.slug}
+            class="filter-btn rounded-full px-3.5 py-1.5 text-xs font-medium border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors cursor-pointer"
+          >
+            {trilha.nome}
+          </button>
+        ))}
+      </div>
+
+      <!-- 3-Column Apple Newsroom Grid -->
+      <div class="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+        {pagePautas.map((pauta) => (
+          <article
+            data-trilha={pauta.trilha}
+            class="pauta-row group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]"
+          >
+            <a
+              href={`/pauta/${pauta.slug}`}
+              data-astro-prefetch="viewport"
+              class="flex flex-1 flex-col focus:outline-none"
+            >
+              <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+                <img
+                  src={pauta.imagem.url}
+                  alt={pauta.imagem.alt}
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                  class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                />
+              </div>
+
+              <div class="flex flex-1 flex-col justify-between p-6">
+                <div>
+                  <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                    {pauta.trilhaLabel}
+                  </span>
+
+                  <h2 class="mt-2 text-[18px] font-bold leading-[1.25] tracking-[-0.018em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                    {pauta.titulo}
+                  </h2>
+                </div>
+
+                <div class="mt-5 flex items-center justify-between text-[12px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
+                  <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                </div>
+              </div>
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <!-- Clean Apple-like Pagination Bar -->
+      <nav
+        aria-label="Paginação"
+        class="mt-12 flex items-center justify-between border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-7"
+      >
+        <a
+          href="/"
+          data-astro-prefetch="viewport"
+          class="group inline-flex items-center gap-2.5 rounded-full bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] px-5 py-2.5 text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity"
+        >
+          <span class="transition-transform group-hover:-translate-x-0.5">←</span>
+          <span>Página anterior</span>
+        </a>
+
+        <div class="flex items-center gap-2 text-[13px] font-medium tabular-nums">
+          <a
+            href="/"
+            class="flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:bg-[var(--color-paper)] dark:hover:bg-[var(--color-dark-surface)] transition-colors"
+          >
+            1
+          </a>
+          <span
+            aria-current="page"
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]"
+          >
+            2
+          </span>
+        </div>
+
+        <span class="hidden sm:inline-flex items-center gap-2 text-[12px] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+          <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+          <span>Fim do arquivo</span>
+        </span>
+      </nav>
+    </section>
+  </div>
+
+  <script is:inline>
+    document.addEventListener('astro:page-load', () => {
+      const buttons = document.querySelectorAll('.filter-btn');
+      const rows = document.querySelectorAll('.pauta-row');
+      if (!buttons.length) return;
+
+      const activeClasses = [
+        'bg-[var(--color-ink)]',
+        'text-[var(--color-paper)]',
+        'border-[var(--color-ink)]',
+        'dark:bg-[var(--color-dark-ink)]',
+        'dark:text-[var(--color-dark-paper)]',
+        'dark:border-[var(--color-dark-ink)]',
+      ];
+
+      const inactiveClasses = [
+        'border-[var(--color-rule)]',
+        'dark:border-[var(--color-dark-rule)]',
+        'bg-[var(--color-paper)]',
+        'dark:bg-[var(--color-dark-surface)]',
+        'text-[var(--color-ink-muted)]',
+        'dark:text-[var(--color-dark-muted)]',
+      ];
+
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const filter = btn.getAttribute('data-filter');
+
+          buttons.forEach((b) => {
+            b.classList.remove(...activeClasses);
+            b.classList.add(...inactiveClasses);
+          });
+          btn.classList.remove(...inactiveClasses);
+          btn.classList.add(...activeClasses);
+
+          rows.forEach((row) => {
+            const trilha = row.getAttribute('data-trilha');
+            if (filter === 'all' || trilha === filter) {
+              row.classList.remove('hidden');
+            } else {
+              row.classList.add('hidden');
+            }
+          });
+        });
+      });
+    });
+  </script>
+</BaseLayout>

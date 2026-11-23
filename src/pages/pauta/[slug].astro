@@ -1,0 +1,679 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { fetchPublishedPautas } from '../../lib/supabase';
+
+const { slug } = Astro.params;
+const allPautas = await fetchPublishedPautas();
+const currentIndex = allPautas.findIndex((p) => p.slug === slug);
+
+if (currentIndex === -1) {
+  return Astro.redirect('/404', 404);
+}
+
+const pauta = allPautas[currentIndex];
+const nextPauta = allPautas[(currentIndex + 1) % allPautas.length];
+const relatedPautas = allPautas
+  .filter((p) => p.slug !== pauta.slug && p.slug !== nextPauta.slug)
+  .slice(0, 2);
+
+Astro.response.headers.set(
+  'Cache-Control',
+  'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+);
+
+const pageUrl = `https://olhapauta.com.br/pauta/${pauta.slug}`;
+
+const formattedDate = new Intl.DateTimeFormat('pt-BR', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(new Date(pauta.dataISO));
+
+const graph: Record<string, unknown>[] = [
+  {
+    '@type': 'Article',
+    headline: pauta.titulo,
+    description: pauta.subtitulo,
+    image: [pauta.imagem.url],
+    datePublished: pauta.dataISO,
+    dateModified: pauta.dataISO,
+    inLanguage: 'pt-BR',
+    articleSection: pauta.trilhaLabel,
+    keywords: pauta.tags.join(', '),
+    author: {
+      '@type': 'Organization',
+      name: pauta.autor.nome,
+      url: 'https://olhapauta.com.br',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'OlhaPauta',
+      url: 'https://olhapauta.com.br',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://olhapauta.com.br/images/logo-olhapauta.webp',
+        width: 377,
+        height: 59,
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': pageUrl,
+    },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Início',
+        item: 'https://olhapauta.com.br/',
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: pauta.trilhaLabel,
+        item: `https://olhapauta.com.br/trilha/${pauta.trilha}`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: pauta.titulo,
+        item: pageUrl,
+      },
+    ],
+  },
+];
+
+if (pauta.faqs && pauta.faqs.length > 0) {
+  graph.push({
+    '@type': 'FAQPage',
+    mainEntity: pauta.faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.pergunta,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.resposta,
+      },
+    })),
+  });
+}
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': graph,
+};
+---
+
+<BaseLayout
+  title={`${pauta.titulo} | OlhaPauta`}
+  description={pauta.subtitulo}
+  ogImage={pauta.imagem.url}
+  ogType="article"
+  canonicalPath={`/pauta/${pauta.slug}`}
+  publishedTime={pauta.dataISO}
+  modifiedTime={pauta.dataISO}
+  articleSection={pauta.trilhaLabel}
+  jsonLd={jsonLd}
+  showReadingBar={true}
+>
+  <article class="mx-auto max-w-[980px] px-5 pt-12 sm:pt-16">
+    <!-- Apple Newsroom Style Header: Centered Column (650px), Left-Aligned Copy -->
+    <header class="mx-auto max-w-[650px]">
+      <div class="text-[12px] leading-snug text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+        <a
+          href={`/trilha/${pauta.trilha}`}
+          class="font-semibold uppercase tracking-[0.05em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-80 transition-opacity"
+        >
+          {pauta.trilhaLabel}
+        </a>
+        <div class="mt-0.5">
+          <time datetime={pauta.dataISO}>{formattedDate}</time>
+        </div>
+      </div>
+
+      <h1 class="mt-4 text-[34px] sm:text-[48px] font-bold leading-[1.08] tracking-[-0.032em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+        {pauta.titulo}
+      </h1>
+
+      <p class="mt-5 text-[19px] sm:text-[21px] leading-[1.42] tracking-[-0.015em] text-[var(--color-ink)]/85 dark:text-[var(--color-dark-ink)]/85">
+        {pauta.subtitulo}
+      </p>
+
+      <!-- Actions Bar: Audio Accessibility Player + Clean Brazil-First Share -->
+      <div class="mt-7 flex flex-wrap items-center justify-between gap-4">
+        <!-- Accessible Audio Reader (Apple-like pill) -->
+        <div class="flex items-center gap-2" role="region" aria-label="Ouvir esta pauta">
+          <button
+            id="audio-play-btn"
+            type="button"
+            aria-pressed="false"
+            class="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <svg id="audio-icon-play" class="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5.14v14l11-7-11-7z"/>
+            </svg>
+            <svg id="audio-icon-pause" class="hidden h-3.5 w-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+            </svg>
+            <span id="audio-btn-label">Ouvir pauta</span>
+          </button>
+
+          <button
+            id="audio-speed-btn"
+            type="button"
+            aria-label="Alterar velocidade da leitura em áudio"
+            class="hidden rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-2.5 py-1.5 text-[11px] font-medium tabular-nums text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors cursor-pointer"
+          >
+            1x
+          </button>
+
+          <button
+            id="audio-stop-btn"
+            type="button"
+            aria-label="Parar leitura em áudio"
+            class="hidden rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors cursor-pointer"
+          >
+            Parar
+          </button>
+
+          <span class="text-[12px] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] pl-0.5 whitespace-nowrap">
+            {pauta.tempoLeitura.toLowerCase()}<span class="hidden sm:inline"> de leitura</span>
+          </span>
+
+          <span id="audio-status" class="sr-only" aria-live="polite"></span>
+        </div>
+
+        <!-- Single Premium Share Button + Animated Popover -->
+        <div class="relative" id="share-wrapper">
+          <button
+            id="share-menu-btn"
+            type="button"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            class="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="16 6 12 2 8 6"/>
+              <line x1="12" x2="12" y1="2" y2="15"/>
+            </svg>
+            <span>Compartilhar</span>
+          </button>
+
+          <div
+            id="share-popover"
+            role="menu"
+            aria-label="Opções de compartilhamento"
+            class="pointer-events-none opacity-0 scale-95 origin-top-right absolute right-0 mt-2 w-52 rounded-2xl border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)]/95 dark:bg-[var(--color-dark-surface)]/95 p-1.5 shadow-xl backdrop-blur-xl transition-all duration-150 ease-out z-30"
+          >
+            <a
+              role="menuitem"
+              href={`https://wa.me/?text=${encodeURIComponent(`${pauta.titulo} ${pageUrl}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors"
+            >
+              <svg class="h-4 w-4 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.766.469 3.484 1.344 5l-1.406 5.156 5.281-1.391c1.469.797 3.109 1.219 4.75 1.219 5.516 0 9.969-4.453 9.969-9.969S17.547 2 12.031 2zm5.828 14.078c-.25.703-1.438 1.344-2 1.422-.516.078-1.188.109-1.922-.125-.453-.141-1.031-.344-1.766-.656-3.109-1.344-5.141-4.5-5.297-4.703-.156-.203-1.266-1.688-1.266-3.219s.797-2.281 1.078-2.594c.281-.312.625-.391.828-.391.203 0 .422.016.609.016.188 0 .453-.078.703.531.266.641.891 2.172.969 2.328.078.156.125.344.016.547-.094.203-.156.328-.312.516-.156.188-.328.406-.469.547-.156.156-.328.328-.141.641.188.312.828 1.359 1.766 2.203 1.219 1.078 2.234 1.422 2.547 1.578.312.156.5.125.688-.078.188-.203.797-.922 1.016-1.234.219-.312.438-.266.734-.156.297.109 1.875.891 2.203 1.047.328.156.547.234.625.375.078.141.078.812-.172 1.516z"/>
+              </svg>
+              <span>WhatsApp</span>
+            </a>
+
+            <a
+              role="menuitem"
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(pageUrl)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors"
+            >
+              <svg class="h-4 w-4 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+              </svg>
+              <span>LinkedIn</span>
+            </a>
+
+            <a
+              role="menuitem"
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(pauta.titulo)}&url=${encodeURIComponent(pageUrl)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors"
+            >
+              <svg class="h-3.5 w-3.5 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              <span>X (Twitter)</span>
+            </a>
+
+            <a
+              role="menuitem"
+              href={`https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(pauta.titulo)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors"
+            >
+              <svg class="h-4 w-4 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+              <span>Telegram</span>
+            </a>
+
+            <div class="my-1.5 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)]"></div>
+
+            <button
+              id="copy-link-btn"
+              type="button"
+              role="menuitem"
+              class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors cursor-pointer"
+            >
+              <svg class="h-4 w-4 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              <span id="copy-link-label">Copiar link</span>
+            </button>
+
+            <button
+              id="native-share-btn"
+              type="button"
+              role="menuitem"
+              class="hidden w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:bg-[var(--color-surface)] dark:hover:bg-[var(--color-dark-paper)] transition-colors cursor-pointer"
+            >
+              <svg class="h-4 w-4 text-[var(--color-ink-subtle)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="1"/>
+                <circle cx="19" cy="12" r="1"/>
+                <circle cx="5" cy="12" r="1"/>
+              </svg>
+              <span>Mais opções…</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- WIDE Hero Image (980px wide, clean rounded corners, no heavy border) -->
+    <figure class="mt-10 sm:mt-12">
+      <div class="overflow-hidden rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)]">
+        <img
+          src={pauta.imagem.url}
+          alt={pauta.imagem.alt}
+          width="1600"
+          height="900"
+          fetchpriority="high"
+          decoding="async"
+          class="aspect-[16/9] sm:aspect-[16/9] w-full object-cover"
+        />
+      </div>
+      <figcaption class="mx-auto mt-3 max-w-[650px] text-center text-[12px] leading-relaxed text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+        {pauta.imagem.credito}
+      </figcaption>
+    </figure>
+
+    <!-- Centered Reading Column (650px, Apple Newsroom measure) -->
+    <div class="mx-auto max-w-[650px] mt-10 sm:mt-12">
+      <!-- Direct Answer Box ("Em 30 segundos" for AIO / GEO) -->
+      <aside
+        aria-label="Resumo da pauta"
+        class="rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6 sm:p-7"
+      >
+        <p class="text-[13px] font-semibold tracking-[-0.01em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] flex items-center gap-2">
+          <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+          <span>O que você precisa saber</span>
+        </p>
+        <ul class="mt-4 space-y-2.5 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+          {pauta.tldr.map((item, idx) => (
+            <li class="flex items-start gap-3">
+              <span class="tabular-nums text-[13px] font-semibold text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] pt-0.5">
+                0{idx + 1}
+              </span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <!-- Body Copy -->
+      <div id="article-body" class="editorial-prose mt-10 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+        {pauta.conteudo.map((section, idx) => (
+          <section id={section.heading ? `secao-${idx + 1}` : undefined} class="scroll-mt-24">
+            {section.heading && <h2>{section.heading}</h2>}
+            {section.paragraphs.map((p) => <p>{p}</p>)}
+
+            {section.quote && <blockquote>{section.quote}</blockquote>}
+
+            {section.callout && (
+              <div class="my-8 rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5 sm:p-6">
+                <p class="!mb-0 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+                  {section.callout.text}
+                </p>
+              </div>
+            )}
+
+            {section.bullets && (
+              <ul>
+                {section.bullets.map((b) => <li>{b}</li>)}
+              </ul>
+            )}
+
+            {/* AdSense In-Article Slot only when there are more sections after it (never stacked ads) */}
+            {idx === 0 && pauta.conteudo.length > 1 && (
+              <AdSlot slotName="in-article-1" format="in-article" minHeight="min-h-[250px]" />
+            )}
+          </section>
+        ))}
+      </div>
+
+      {/* FAQ Section for SEO + AIO + GEO */}
+      {pauta.faqs && pauta.faqs.length > 0 && (
+        <section
+          aria-label="Perguntas frequentes"
+          class="mt-12 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-10"
+        >
+          <h2 class="text-2xl font-bold tracking-[-0.025em]">
+            Perguntas frequentes<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+          </h2>
+
+          <div class="mt-6 divide-y divide-[var(--color-rule)] dark:divide-[var(--color-dark-rule)] border-y border-[var(--color-rule)] dark:border-[var(--color-dark-rule)]">
+            {pauta.faqs.map((faq) => (
+              <details class="group py-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                  <span>{faq.pergunta}</span>
+                  <span class="text-base font-normal text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] transition-transform group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p class="mt-3 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+                  {faq.resposta}
+                </p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* AdSense End-of-Article Slot */}
+      <AdSlot slotName="after-article" format="display" minHeight="min-h-[250px]" />
+
+      <!-- Author Credit (E-E-A-T) -->
+      <div class="mt-8 flex items-center gap-3 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-6">
+        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-xs font-semibold text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]">
+          OP
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            {pauta.autor.nome}
+          </p>
+          <p class="text-xs text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+            {pauta.autor.cargo} · Atualizado em {formattedDate}
+          </p>
+        </div>
+      </div>
+
+      <!-- Primary Next Pauta Card -->
+      <section aria-label="Próxima pauta" class="mt-12">
+        <a
+          href={`/pauta/${nextPauta.slug}`}
+          data-astro-prefetch="viewport"
+          class="group block rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6 sm:p-8 transition-transform duration-200 hover:-translate-y-0.5"
+        >
+          <div class="flex items-center justify-between gap-2 text-xs font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+            <span class="inline-flex items-center gap-2 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] font-semibold">
+              <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+              Próxima pauta
+            </span>
+            <span>{nextPauta.tempoLeitura.toLowerCase()} de leitura</span>
+          </div>
+
+          <h2 class="mt-3 text-xl sm:text-2xl font-bold leading-snug tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            {nextPauta.titulo}
+          </h2>
+
+          <p class="mt-2 text-sm sm:text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+            {nextPauta.resumoCurto}
+          </p>
+
+          <div class="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            Continuar leitura
+            <span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] transition-transform group-hover:translate-x-1">→</span>
+          </div>
+        </a>
+      </section>
+
+      <!-- Related Pautas -->
+      <section class="mt-8" aria-label="Outras pautas recomendadas">
+        <div class="grid gap-4 sm:grid-cols-2">
+          {relatedPautas.map((rel) => (
+            <a
+              href={`/pauta/${rel.slug}`}
+              class="group rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5 hover:opacity-85 transition-opacity"
+            >
+              <div class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                {rel.trilhaLabel} · {rel.tempoLeitura.toLowerCase()}
+              </div>
+              <h3 class="mt-1.5 text-base font-semibold leading-snug tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                {rel.titulo}
+              </h3>
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+  </article>
+
+  <!-- Subtle Floating Next Pauta Pill (appears after 68% scroll) -->
+  <div
+    id="next-pauta-dock"
+    class="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[calc(100%-2rem)] max-w-md"
+  >
+    <a
+      href={`/pauta/${nextPauta.slug}`}
+      data-astro-prefetch="load"
+      class="pointer-events-auto flex items-center justify-between gap-3 rounded-full border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)]/95 dark:bg-[var(--color-dark-surface)]/95 px-4 py-2.5 shadow-lg backdrop-blur-md hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors"
+    >
+      <div class="min-w-0">
+        <p class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+          Próxima pauta
+        </p>
+        <p class="truncate text-xs font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+          {nextPauta.titulo}
+        </p>
+      </div>
+      <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-xs text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]">
+        →
+      </span>
+    </a>
+  </div>
+
+  <script is:inline>
+    (() => {
+      let scrollHandler = null;
+      let outsideClickHandler = null;
+      let keyHandler = null;
+
+      const cleanup = () => {
+        if (scrollHandler) window.removeEventListener('scroll', scrollHandler);
+        if (outsideClickHandler) document.removeEventListener('click', outsideClickHandler);
+        if (keyHandler) document.removeEventListener('keydown', keyHandler);
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      };
+
+      const initPautaPage = () => {
+        cleanup();
+
+        const bar = document.getElementById('reading-progress');
+        const dock = document.getElementById('next-pauta-dock');
+
+        scrollHandler = () => {
+          const scrollTop = window.scrollY;
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = docHeight > 0 ? Math.min(100, Math.max(0, (scrollTop / docHeight) * 100)) : 0;
+
+          if (bar) bar.style.width = `${progress}%`;
+
+          if (dock) {
+            if (progress > 68 && progress < 96) {
+              dock.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+            } else {
+              dock.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+            }
+          }
+        };
+
+        window.addEventListener('scroll', scrollHandler, { passive: true });
+        scrollHandler();
+
+        // Share Popover Toggle
+        const shareWrapper = document.getElementById('share-wrapper');
+        const shareMenuBtn = document.getElementById('share-menu-btn');
+        const sharePopover = document.getElementById('share-popover');
+        let shareOpen = false;
+
+        const setShareOpen = (open) => {
+          shareOpen = open;
+          shareMenuBtn?.setAttribute('aria-expanded', String(open));
+          if (sharePopover && shareMenuBtn) {
+            if (open) {
+              const rect = shareMenuBtn.getBoundingClientRect();
+              const alignLeft = rect.left < window.innerWidth / 2;
+              sharePopover.classList.toggle('left-0', alignLeft);
+              sharePopover.classList.toggle('right-0', !alignLeft);
+              sharePopover.classList.toggle('origin-top-left', alignLeft);
+              sharePopover.classList.toggle('origin-top-right', !alignLeft);
+            }
+            sharePopover.classList.toggle('opacity-0', !open);
+            sharePopover.classList.toggle('scale-95', !open);
+            sharePopover.classList.toggle('pointer-events-none', !open);
+          }
+        };
+
+        shareMenuBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setShareOpen(!shareOpen);
+        });
+
+        outsideClickHandler = (e) => {
+          if (shareOpen && shareWrapper && !shareWrapper.contains(e.target)) {
+            setShareOpen(false);
+          }
+        };
+        document.addEventListener('click', outsideClickHandler);
+
+        keyHandler = (e) => {
+          if (e.key === 'Escape' && shareOpen) setShareOpen(false);
+        };
+        document.addEventListener('keydown', keyHandler);
+
+        const copyBtn = document.getElementById('copy-link-btn');
+        const copyLabel = document.getElementById('copy-link-label');
+        copyBtn?.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(window.location.href);
+            if (copyLabel) copyLabel.textContent = 'Link copiado ✓';
+            setTimeout(() => {
+              if (copyLabel) copyLabel.textContent = 'Copiar link';
+              setShareOpen(false);
+            }, 1200);
+          } catch {}
+        });
+
+        const nativeShareBtn = document.getElementById('native-share-btn');
+        if (navigator.share && nativeShareBtn) {
+          nativeShareBtn.classList.remove('hidden');
+          nativeShareBtn.classList.add('flex');
+          nativeShareBtn.addEventListener('click', async () => {
+            setShareOpen(false);
+            try {
+              await navigator.share({
+                title: document.title,
+                url: window.location.href,
+              });
+            } catch {}
+          });
+        }
+
+        // Accessible Audio Reader (Web Speech API in pt-BR)
+        const playBtn = document.getElementById('audio-play-btn');
+        const speedBtn = document.getElementById('audio-speed-btn');
+        const stopBtn = document.getElementById('audio-stop-btn');
+        const iconPlay = document.getElementById('audio-icon-play');
+        const iconPause = document.getElementById('audio-icon-pause');
+        const btnLabel = document.getElementById('audio-btn-label');
+        const statusEl = document.getElementById('audio-status');
+
+        if ('speechSynthesis' in window && playBtn) {
+          const speeds = [1, 1.25, 1.5];
+          let speedIdx = 0;
+          let state = 'idle';
+
+          const getArticleText = () => {
+            const title = document.querySelector('article h1')?.textContent?.trim() || '';
+            const subtitle = document.querySelector('article header p')?.textContent?.trim() || '';
+            const body = document.getElementById('article-body')?.innerText?.trim() || '';
+            return `${title}. ${subtitle}. ${body}`;
+          };
+
+          const setUI = (nextState) => {
+            state = nextState;
+            const playing = state === 'playing';
+            const active = state !== 'idle';
+
+            playBtn.setAttribute('aria-pressed', String(playing));
+            iconPlay?.classList.toggle('hidden', playing);
+            iconPause?.classList.toggle('hidden', !playing);
+            speedBtn?.classList.toggle('hidden', !active);
+            stopBtn?.classList.toggle('hidden', !active);
+
+            if (btnLabel) {
+              btnLabel.textContent = playing ? 'Pausar' : state === 'paused' ? 'Continuar' : 'Ouvir pauta';
+            }
+            if (statusEl) {
+              statusEl.textContent = playing ? 'Reproduzindo pauta em áudio.' : state === 'paused' ? 'Leitura pausada.' : 'Leitura interrompida.';
+            }
+          };
+
+          const startSpeaking = () => {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(getArticleText());
+            utterance.lang = 'pt-BR';
+            utterance.rate = speeds[speedIdx];
+            utterance.onend = () => setUI('idle');
+            utterance.onerror = () => setUI('idle');
+            window.speechSynthesis.speak(utterance);
+            setUI('playing');
+          };
+
+          playBtn.addEventListener('click', () => {
+            if (state === 'idle') {
+              startSpeaking();
+            } else if (state === 'playing') {
+              window.speechSynthesis.pause();
+              setUI('paused');
+            } else if (state === 'paused') {
+              window.speechSynthesis.resume();
+              setUI('playing');
+            }
+          });
+
+          speedBtn?.addEventListener('click', () => {
+            speedIdx = (speedIdx + 1) % speeds.length;
+            speedBtn.textContent = `${speeds[speedIdx]}x`;
+            if (state !== 'idle') startSpeaking();
+          });
+
+          stopBtn?.addEventListener('click', () => {
+            window.speechSynthesis.cancel();
+            setUI('idle');
+          });
+        } else if (playBtn) {
+          playBtn.classList.add('hidden');
+        }
+      };
+
+      document.addEventListener('astro:page-load', initPautaPage);
+      document.addEventListener('astro:before-swap', cleanup);
+    })();
+  </script>
+</BaseLayout>
