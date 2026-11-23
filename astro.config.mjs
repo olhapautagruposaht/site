@@ -5,7 +5,9 @@ import cloudflare from '@astrojs/cloudflare';
 export default defineConfig({
   site: 'https://olhapauta.com.br',
   output: 'server',
-  adapter: cloudflare(),
+  adapter: cloudflare({
+    imageService: 'passthrough',
+  }),
   vite: {
     plugins: [tailwindcss()],
   },
