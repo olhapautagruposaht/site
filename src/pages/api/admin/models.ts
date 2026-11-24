@@ -4,6 +4,7 @@ import {
   getServiceSupabase,
   isAdminAuthenticated,
 } from '../../../lib/admin-auth';
+import { assertSafeExternalUrl } from '../../../lib/security';
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
   const auth = await isAdminAuthenticated(request, cookies, locals);
@@ -46,7 +47,11 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     if (provider === 'gemini') {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=100`
+        'https://generativelanguage.googleapis.com/v1beta/models?pageSize=100',
+        {
+          signal: AbortSignal.timeout(12000),
+          headers: { 'x-goog-api-key': apiKey },
+        }
       );
       if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
       const data = (await res.json()) as {
@@ -79,9 +84,15 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         opencode_go: 'https://opencode.ai/zen/go/v1/models',
         custom: `${baseUrl.replace(/\/+$/, '')}/models`,
       };
-      const url = endpoints[provider];
+      let url = endpoints[provider];
+      if (provider === 'custom') {
+        if (!baseUrl) throw new Error('Informe a Base URL para listar modelos.');
+        const safe = assertSafeExternalUrl(baseUrl, { allowHttpInDev: true });
+        url = `${safe.toString().replace(/\/+$/, '')}/models`;
+      }
       if (!url || url === '/models') throw new Error('Informe a Base URL para listar modelos.');
       const res = await fetch(url, {
+        signal: AbortSignal.timeout(12000),
         headers: { Authorization: `Bearer ${apiKey || 'public'}` },
       });
       if (!res.ok) throw new Error(`${provider} HTTP ${res.status}`);

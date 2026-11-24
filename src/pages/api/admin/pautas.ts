@@ -104,8 +104,9 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const status = payload.status || 'draft';
     const quality = evaluatePautaQuality(payload);
 
-    // Block publishing if critical quality rules fail (unless force=true)
-    if (status === 'published' && quality.blockers.length > 0 && !payload.force) {
+    // Only human cookie session can override Quality Gate; external API keys must pass cleanly
+    const canForce = auth.via === 'cookie' && Boolean(payload.force);
+    if (status === 'published' && quality.blockers.length > 0 && !canForce) {
       return new Response(
         JSON.stringify({
           ok: false,
@@ -147,14 +148,23 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         : [],
     };
 
-    if (status === 'published') {
-      record.published_at = new Date().toISOString();
-    }
-
     let result;
     if (payload.id) {
+      if (status === 'published') {
+        const { data: existingRow } = await client
+          .from('pautas')
+          .select('published_at')
+          .eq('id', payload.id)
+          .maybeSingle();
+        if (!existingRow?.published_at) {
+          record.published_at = new Date().toISOString();
+        }
+      }
       result = await client.from('pautas').update(record).eq('id', payload.id).select('*').single();
     } else {
+      if (status === 'published') {
+        record.published_at = new Date().toISOString();
+      }
       result = await client.from('pautas').insert(record).select('*').single();
     }
 

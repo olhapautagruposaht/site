@@ -1,6 +1,11 @@
 import { env as cfEnv } from 'cloudflare:workers';
 import type { PautaPayload } from './editorial-validator';
 import type { TrilhaSlug } from '../data/pautas';
+import {
+  assertSafeExternalUrl,
+  detectImageMimeFromMagicBytes,
+  readResponseBytesWithLimit,
+} from './security';
 
 export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'deepseek' | 'openrouter' | 'opencode' | 'opencode_go' | 'custom';
 export type ImageProvider = 'auto' | 'cloudflare' | 'huggingface' | 'fal' | 'gemini' | 'openai';
@@ -95,23 +100,27 @@ function stripHtmlToText(html: string): string {
 async function fetchReferenceSnippets(urls: string[]): Promise<string> {
   if (!urls.length) return '';
   const snippets: string[] = [];
-  for (const url of urls.slice(0, 3)) {
+  for (const rawUrl of urls.slice(0, 3)) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(url, {
+      const safe = assertSafeExternalUrl(rawUrl);
+      const res = await fetch(safe.toString(), {
         signal: controller.signal,
+        redirect: 'error',
         headers: { 'User-Agent': 'OlhaPautaBot/1.0 (+https://olhapauta.com.br)' },
       });
-      clearTimeout(timeout);
       if (res.ok) {
-        const text = stripHtmlToText(await res.text());
+        const bytes = await readResponseBytesWithLimit(res, 512 * 1024);
+        const text = stripHtmlToText(new TextDecoder().decode(bytes));
         if (text.length > 100) {
-          snippets.push(`FONTE (${url}):\n${text}`);
+          snippets.push(`FONTE (${safe.toString()}):\n${text}`);
         }
       }
     } catch {
-      // Ignore unreachable reference URLs
+      // Ignore unreachable or blocked reference URLs
+    } finally {
+      clearTimeout(timeout);
     }
   }
   return snippets.join('\n\n');
@@ -124,6 +133,7 @@ async function searchWithTavily(
   try {
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         api_key: apiKey,
@@ -157,11 +167,15 @@ async function callGeminiWithSearch(
   maxTokens = 4500
 ): Promise<{ text: string; groundingUrls: string[] }> {
   const model = settings.ai_model || 'gemini-3.8-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.ai_api_key)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(45000),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': settings.ai_api_key,
+    },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -199,15 +213,19 @@ async function callGeminiWithSearch(
 async function callProvider(
   settings: AiSettings,
   userPrompt: string,
-  maxTokens = 4500
+  maxTokens = 4500,
+  signal?: AbortSignal
 ): Promise<string> {
   if (!settings.ai_api_key) {
     throw new Error('Chave de API não configurada em Minha IA (API).');
   }
 
+  const reqSignal = signal || AbortSignal.timeout(45000);
+
   if (settings.ai_provider === 'anthropic') {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: reqSignal,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': settings.ai_api_key,
@@ -230,13 +248,13 @@ async function callProvider(
     return data.content?.find((c) => c.type === 'text')?.text || '';
   }
 
-  const endpoint =
-    settings.ai_provider === 'custom'
-      ? `${(settings.ai_base_url || '').replace(/\/+$/, '')}/chat/completions`
-      : PROVIDER_ENDPOINTS[settings.ai_provider];
-
-  if (!endpoint || endpoint === '/chat/completions') {
-    throw new Error('URL base do provedor customizado não informada.');
+  let endpoint = '';
+  if (settings.ai_provider === 'custom') {
+    if (!settings.ai_base_url) throw new Error('URL base do provedor customizado não informada.');
+    const safeBase = assertSafeExternalUrl(settings.ai_base_url, { allowHttpInDev: true });
+    endpoint = `${safeBase.toString().replace(/\/+$/, '')}/chat/completions`;
+  } else {
+    endpoint = PROVIDER_ENDPOINTS[settings.ai_provider];
   }
 
   const headers: Record<string, string> = {
@@ -254,6 +272,7 @@ async function callProvider(
 
   const res = await fetch(endpoint, {
     method: 'POST',
+    signal: reqSignal,
     headers,
     body: JSON.stringify({
       model: settings.ai_model,
@@ -304,11 +323,14 @@ export async function testAiConnection(
   try {
     if (settings.ai_provider === 'gemini') {
       const model = settings.ai_model || 'gemini-3.8-flash';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.ai_api_key)}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': settings.ai_api_key,
+        },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'Responda apenas: OK' }] }],
           generationConfig: { maxOutputTokens: 32, temperature: 0 },
@@ -325,7 +347,7 @@ export async function testAiConnection(
       return { ok: true, reply: reply || 'OK (conectado)' };
     }
 
-    const raw = await callProvider(settings, 'Responda apenas: OK', 64);
+    const raw = await callProvider(settings, 'Responda apenas: OK', 64, controller.signal);
     return { ok: true, reply: raw.slice(0, 120) || 'OK (conectado)' };
   } catch (err) {
     const msg =
@@ -626,13 +648,15 @@ export async function generateCoverImage(
     const data = (await res.json()) as { images?: { url?: string; content_type?: string }[] };
     const imgUrl = data.images?.[0]?.url;
     if (!imgUrl) throw new Error('fal.ai não retornou URL da imagem.');
-    const imgRes = await fetch(imgUrl);
-    const bytes = new Uint8Array(await imgRes.arrayBuffer());
-    const contentType = data.images?.[0]?.content_type || imgRes.headers.get('content-type') || 'image/jpeg';
+    const safeImgUrl = assertSafeExternalUrl(imgUrl);
+    const imgRes = await fetch(safeImgUrl.toString(), { signal: AbortSignal.timeout(15000) });
+    if (!imgRes.ok) throw new Error(`Falha ao baixar imagem do fal.ai (HTTP ${imgRes.status}).`);
+    const bytes = await readResponseBytesWithLimit(imgRes, 10 * 1024 * 1024);
+    const contentType = detectImageMimeFromMagicBytes(bytes) || 'image/jpeg';
     return {
       bytes,
       contentType,
-      ext: contentType.includes('png') ? 'png' : 'jpg',
+      ext: contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg',
       providerUsed: `fal:${model}`,
     };
   }
@@ -642,10 +666,11 @@ export async function generateCoverImage(
 
     // Support both Imagen (:predict) and native Gemini image models (:generateContent)
     if (model.toLowerCase().includes('imagen')) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:predict?key=${encodeURIComponent(apiKey)}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:predict`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(30000),
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           instances: [{ prompt: artDirection }],
           parameters: {
@@ -675,10 +700,11 @@ export async function generateCoverImage(
       };
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(30000),
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: artDirection }] }],
         generationConfig: { responseModalities: ['IMAGE'] },
@@ -750,12 +776,15 @@ export async function generateCoverImage(
     };
   }
   if (item?.url) {
-    const imgRes = await fetch(item.url);
-    const buf = new Uint8Array(await imgRes.arrayBuffer());
+    const safeUrl = assertSafeExternalUrl(item.url);
+    const imgRes = await fetch(safeUrl.toString(), { signal: AbortSignal.timeout(15000) });
+    if (!imgRes.ok) throw new Error(`Falha ao baixar imagem da OpenAI (HTTP ${imgRes.status}).`);
+    const buf = await readResponseBytesWithLimit(imgRes, 10 * 1024 * 1024);
+    const mime = detectImageMimeFromMagicBytes(buf) || 'image/png';
     return {
       bytes: buf,
-      contentType: 'image/png',
-      ext: 'png',
+      contentType: mime,
+      ext: mime.includes('webp') ? 'webp' : mime.includes('jpeg') ? 'jpg' : 'png',
       providerUsed: `openai:${model}`,
     };
   }

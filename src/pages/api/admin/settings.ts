@@ -5,6 +5,7 @@ import {
   isAdminAuthenticated,
 } from '../../../lib/admin-auth';
 import { testAiConnection, type AiProvider, type AiSettings } from '../../../lib/ai-generator';
+import { assertSafeExternalUrl } from '../../../lib/security';
 
 function maskKey(key?: string | null): string {
   if (!key) return '';
@@ -86,6 +87,12 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       .maybeSingle();
 
     const provider = (body.ai_provider || 'gemini') as AiProvider;
+    let safeBaseUrl: string | null = null;
+    if (body.ai_base_url?.trim()) {
+      safeBaseUrl = assertSafeExternalUrl(String(body.ai_base_url), { allowHttpInDev: true })
+        .toString()
+        .replace(/\/+$/, '');
+    }
     const vault: Record<string, string> = {
       ...((existing?.provider_keys as Record<string, string> | null) || {}),
     };
@@ -108,7 +115,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       ai_model: (body.ai_model || 'gemini-3.8-flash').trim(),
       ai_api_key: activeApiKey,
       provider_keys: vault,
-      ai_base_url: body.ai_base_url?.trim() || null,
+      ai_base_url: safeBaseUrl,
       search_api_key: searchApiKey,
       image_provider: body.image_provider || 'cloudflare',
       image_model: (body.image_model || '@cf/black-forest-labs/flux-1-schnell').trim(),
@@ -174,11 +181,18 @@ export const PUT: APIRoute = async ({ request, cookies, locals }) => {
       apiKey = 'public';
     }
 
+    let safeBaseUrl: string | null = null;
+    if (body.ai_base_url?.trim()) {
+      safeBaseUrl = assertSafeExternalUrl(String(body.ai_base_url), { allowHttpInDev: true })
+        .toString()
+        .replace(/\/+$/, '');
+    }
+
     const settings: AiSettings = {
       ai_provider: provider,
       ai_model: body.ai_model || 'gemini-3.8-flash',
       ai_api_key: apiKey || '',
-      ai_base_url: body.ai_base_url?.trim() || null,
+      ai_base_url: safeBaseUrl,
     };
 
     const test = await testAiConnection(settings);

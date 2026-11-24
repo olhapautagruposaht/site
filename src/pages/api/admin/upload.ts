@@ -5,8 +5,9 @@ import {
   isAdminAuthenticated,
 } from '../../../lib/admin-auth';
 import { slugify } from '../../../lib/editorial-validator';
+import { detectImageMimeFromMagicBytes } from '../../../lib/security';
 
-const ALLOWED_TYPES = new Set(['image/webp', 'image/jpeg', 'image/png', 'image/avif']);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
   const auth = await isAdminAuthenticated(request, cookies, locals);
@@ -35,30 +36,31 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       });
     }
 
-    if (!ALLOWED_TYPES.has(file.type)) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Formato inválido. Use WebP, JPG, PNG ou AVIF.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
-      );
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      return new Response(JSON.stringify({ ok: false, error: 'Imagem excede 10 MB.' }), {
+    if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
+      return new Response(JSON.stringify({ ok: false, error: 'Imagem deve ter entre 1 byte e 10 MB.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
       });
     }
 
-    const ext = file.type.split('/')[1].replace('jpeg', 'jpg');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const realMime = detectImageMimeFromMagicBytes(bytes);
+    if (!realMime) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Arquivo inválido. Apenas imagens reais WebP, JPG, PNG ou AVIF são aceitas.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+      );
+    }
+
+    const ext = realMime.split('/')[1].replace('jpeg', 'jpg');
     const baseName = slugify(file.name.replace(/\.[^.]+$/, '')) || 'capa';
     const now = new Date();
     const path = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${Date.now()}-${baseName}.${ext}`;
 
-    const buffer = await file.arrayBuffer();
     const { error: uploadErr } = await client.storage
       .from('pautas-images')
-      .upload(path, buffer, {
-        contentType: file.type,
+      .upload(path, bytes, {
+        contentType: realMime,
         cacheControl: '31536000',
         upsert: false,
       });

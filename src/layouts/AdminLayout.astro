@@ -29,11 +29,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     />
   </head>
   <body class="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] antialiased">
+    <div id="admin-nav-bar" class="pointer-events-none fixed inset-x-0 top-0 z-50 h-[2px] bg-[#D92B2B] opacity-0 transition-opacity duration-150"></div>
     {!hideNav && (
       <header class="sticky top-0 z-40 border-b border-black/10 bg-white/85 backdrop-blur-xl">
         <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
           <div class="flex items-center gap-6">
-            <a href="/admin" class="flex items-center gap-2 text-sm font-bold tracking-tight">
+            <a href="/admin" data-astro-prefetch="hover" class="admin-nav-link flex items-center gap-2 text-sm font-bold tracking-tight">
               <img src="/images/logo-olhapauta.webp" alt="OlhaPauta" class="h-[18px] w-auto" />
               <span class="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-semibold text-black/60">
                 CMS
@@ -43,7 +44,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
             <nav class="hidden md:flex items-center gap-1 text-[13px] font-medium">
               <a
                 href="/admin"
-                class={`rounded-full px-3 py-1.5 transition-colors ${
+                data-astro-prefetch="hover"
+                class={`admin-nav-link rounded-full px-3 py-1.5 transition-colors ${
                   activeNav === 'pautas' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
                 }`}
               >
@@ -51,7 +53,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </a>
               <a
                 href="/admin/editor"
-                class={`rounded-full px-3 py-1.5 transition-colors ${
+                data-astro-prefetch="hover"
+                class={`admin-nav-link rounded-full px-3 py-1.5 transition-colors ${
                   activeNav === 'editor' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
                 }`}
               >
@@ -59,7 +62,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </a>
               <a
                 href="/admin/configuracoes"
-                class={`rounded-full px-3 py-1.5 transition-colors ${
+                data-astro-prefetch="hover"
+                class={`admin-nav-link rounded-full px-3 py-1.5 transition-colors ${
                   activeNav === 'configuracoes' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
                 }`}
               >
@@ -67,7 +71,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </a>
               <a
                 href="/admin/integracoes"
-                class={`rounded-full px-3 py-1.5 transition-colors ${
+                data-astro-prefetch="hover"
+                class={`admin-nav-link rounded-full px-3 py-1.5 transition-colors ${
                   activeNav === 'integracoes' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
                 }`}
               >
@@ -102,9 +107,21 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
     {!hideNav && (
       <script is:inline>
+        const navBar = document.getElementById('admin-nav-bar');
+        document.querySelectorAll('.admin-nav-link').forEach((link) => {
+          link.addEventListener('click', () => {
+            if (navBar) navBar.style.opacity = '1';
+          });
+        });
+
         document.getElementById('admin-logout-btn')?.addEventListener('click', async () => {
-          await fetch('/api/admin/login', { method: 'DELETE' });
-          window.location.href = '/admin/login';
+          try {
+            const res = await fetch('/api/admin/login', { method: 'DELETE' });
+            if (!res.ok) throw new Error('Falha ao encerrar sessão.');
+            window.location.href = '/admin/login';
+          } catch (err) {
+            alert(err.message || 'Erro ao sair. Tente novamente.');
+          }
         });
       </script>
     )}

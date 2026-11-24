@@ -429,6 +429,14 @@ if (client) {
       'neste artigo vamos',
     ];
 
+    const escHtml = (str) =>
+      String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
     const slugify = (text) =>
       (text || '')
         .normalize('NFD')
@@ -464,8 +472,8 @@ if (client) {
             <span class="text-[11px] font-bold uppercase tracking-wider text-black/45">Seção H2 #${idx + 1}</span>
             <button type="button" data-remove-sec="${idx}" class="text-xs font-semibold text-red-600 hover:underline cursor-pointer">Remover</button>
           </div>
-          <input type="text" data-sec-field="heading" data-idx="${idx}" value="${(sec.heading || '').replace(/"/g, '&quot;')}" placeholder="Título H2 desta seção" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm font-semibold" />
-          <textarea rows="4" data-sec-field="paragraphs" data-idx="${idx}" placeholder="Parágrafos da seção (separe parágrafos com uma linha em branco)" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm">${(sec.paragraphs || []).join('\n\n')}</textarea>
+          <input type="text" data-sec-field="heading" data-idx="${idx}" value="${escHtml(sec.heading)}" placeholder="Título H2 desta seção" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm font-semibold" />
+          <textarea rows="4" data-sec-field="paragraphs" data-idx="${idx}" placeholder="Parágrafos da seção (separe parágrafos com uma linha em branco)" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm">${escHtml((sec.paragraphs || []).join('\n\n'))}</textarea>
 
           <div class="space-y-2 pl-3 border-l-2 border-black/10">
             ${(sec.subsections || [])
@@ -476,8 +484,8 @@ if (client) {
                   <span class="text-[10px] font-bold uppercase text-black/45">Subseção H3</span>
                   <button type="button" data-remove-sub="${idx}:${sIdx}" class="text-[11px] text-red-600 cursor-pointer">Remover H3</button>
                 </div>
-                <input type="text" data-sub-field="heading" data-idx="${idx}" data-sidx="${sIdx}" value="${(sub.heading || '').replace(/"/g, '&quot;')}" placeholder="Subtítulo H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs font-semibold" />
-                <textarea rows="2" data-sub-field="paragraphs" data-idx="${idx}" data-sidx="${sIdx}" placeholder="Texto da subseção H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs">${(sub.paragraphs || []).join('\n\n')}</textarea>
+                <input type="text" data-sub-field="heading" data-idx="${idx}" data-sidx="${sIdx}" value="${escHtml(sub.heading)}" placeholder="Subtítulo H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs font-semibold" />
+                <textarea rows="2" data-sub-field="paragraphs" data-idx="${idx}" data-sidx="${sIdx}" placeholder="Texto da subseção H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs">${escHtml((sub.paragraphs || []).join('\n\n'))}</textarea>
               </div>
             `
               )
@@ -488,9 +496,9 @@ if (client) {
           <details class="text-xs text-black/60">
             <summary class="cursor-pointer font-semibold">Extras opcionais (citação, callout, lista)</summary>
             <div class="mt-2 space-y-2">
-              <input type="text" data-sec-field="quote" data-idx="${idx}" value="${(sec.quote || '').replace(/"/g, '&quot;')}" placeholder="Citação editorial de destaque (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
-              <input type="text" data-sec-field="calloutText" data-idx="${idx}" value="${(sec.calloutText || '').replace(/"/g, '&quot;')}" placeholder="Box de contexto / callout (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
-              <textarea rows="2" data-sec-field="bullets" data-idx="${idx}" placeholder="Itens em lista (1 item por linha, opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs">${sec.bullets || ''}</textarea>
+              <input type="text" data-sec-field="quote" data-idx="${idx}" value="${escHtml(sec.quote)}" placeholder="Citação editorial de destaque (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
+              <input type="text" data-sec-field="calloutText" data-idx="${idx}" value="${escHtml(sec.calloutText)}" placeholder="Box de contexto / callout (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
+              <textarea rows="2" data-sec-field="bullets" data-idx="${idx}" placeholder="Itens em lista (1 item por linha, opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs">${escHtml(sec.bullets)}</textarea>
             </div>
           </details>
         </div>
@@ -562,8 +570,8 @@ if (client) {
             <span class="text-[11px] font-bold uppercase text-black/45">FAQ #${idx + 1}</span>
             <button type="button" data-remove-faq="${idx}" class="text-xs text-red-600 cursor-pointer">Remover</button>
           </div>
-          <input type="text" data-faq-field="pergunta" data-idx="${idx}" value="${(faq.pergunta || '').replace(/"/g, '&quot;')}" placeholder="Pergunta real que o leitor busca no Google?" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs font-semibold" />
-          <textarea rows="2" data-faq-field="resposta" data-idx="${idx}" placeholder="Resposta objetiva em 2 a 3 frases" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs">${faq.resposta || ''}</textarea>
+          <input type="text" data-faq-field="pergunta" data-idx="${idx}" value="${escHtml(faq.pergunta)}" placeholder="Pergunta real que o leitor busca no Google?" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs font-semibold" />
+          <textarea rows="2" data-faq-field="resposta" data-idx="${idx}" placeholder="Resposta objetiva em 2 a 3 frases" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs">${escHtml(faq.resposta)}</textarea>
         </div>
       `
         )
@@ -810,10 +818,10 @@ if (client) {
             data-pick-photo="${idx}"
             class="group overflow-hidden rounded-xl border border-black/10 bg-white text-left hover:border-black transition-colors cursor-pointer"
           >
-            <img src="${img.url}" alt="${img.title}" loading="lazy" class="aspect-[16/9] w-full object-cover group-hover:scale-[1.03] transition-transform" />
+            <img src="${escHtml(img.url)}" alt="${escHtml(img.title)}" loading="lazy" class="aspect-[16/9] w-full object-cover group-hover:scale-[1.03] transition-transform" />
             <div class="p-2">
-              <p class="truncate text-[10px] font-semibold text-[#1D1D1F]">${img.license} · ${img.width}×${img.height}</p>
-              <p class="truncate text-[10px] text-black/50">${img.credit}</p>
+              <p class="truncate text-[10px] font-semibold text-[#1D1D1F]">${escHtml(img.license)} · ${Number(img.width)}×${Number(img.height)}</p>
+              <p class="truncate text-[10px] text-black/50">${escHtml(img.credit)}</p>
             </div>
           </button>
         `
@@ -987,12 +995,12 @@ if (client) {
           <div class="flex flex-col justify-between rounded-2xl border border-black/10 bg-[#F5F5F7]/70 p-4 space-y-2.5">
             <div>
               <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                <span class="text-[#D92B2B]">${item.trilha}</span>
+                <span class="text-[#D92B2B]">${escHtml(item.trilha)}</span>
                 <span class="rounded-full bg-black/5 px-2 py-0.5 text-black/60">${item.foco === 'search' ? 'Search / AIO' : 'Discover'}</span>
               </div>
-              <p class="mt-1.5 text-xs font-bold leading-snug text-[#1D1D1F]">${item.titulo}</p>
-              <p class="mt-1 text-[11px] leading-relaxed text-black/65">${item.angulo}</p>
-              <p class="mt-1 text-[10px] text-black/45">${item.motivo}</p>
+              <p class="mt-1.5 text-xs font-bold leading-snug text-[#1D1D1F]">${escHtml(item.titulo)}</p>
+              <p class="mt-1 text-[11px] leading-relaxed text-black/65">${escHtml(item.angulo)}</p>
+              <p class="mt-1 text-[10px] text-black/45">${escHtml(item.motivo)}</p>
             </div>
             <button
               type="button"

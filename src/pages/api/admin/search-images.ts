@@ -5,8 +5,15 @@ import {
   isAdminAuthenticated,
 } from '../../../lib/admin-auth';
 import { slugify } from '../../../lib/editorial-validator';
+import {
+  assertSafeExternalUrl,
+  detectImageMimeFromMagicBytes,
+  readResponseBytesWithLimit,
+} from '../../../lib/security';
 
 const FREE_LICENSES = ['cc0', 'public domain', 'cc by', 'cc-by', 'pd-'];
+const WIKIMEDIA_ALLOWED_HOSTS = ['upload.wikimedia.org', 'thumb.wikimedia.org', 'commons.wikimedia.org'];
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 
 function stripTags(html?: string): string {
   return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -62,7 +69,13 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         });
       }
 
-      const imgRes = await fetch(String(body.importUrl), {
+      const safeUrl = assertSafeExternalUrl(String(body.importUrl), {
+        allowHosts: WIKIMEDIA_ALLOWED_HOSTS,
+      });
+
+      const imgRes = await fetch(safeUrl.toString(), {
+        redirect: 'error',
+        signal: AbortSignal.timeout(12000),
         headers: { 'User-Agent': 'OlhaPautaCMS/1.0 (+https://olhapauta.com.br)' },
       });
       if (!imgRes.ok) {
@@ -72,16 +85,23 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         );
       }
 
-      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-      const bytes = new Uint8Array(await imgRes.arrayBuffer());
+      const bytes = await readResponseBytesWithLimit(imgRes, MAX_IMPORT_BYTES);
+      const realMime = detectImageMimeFromMagicBytes(bytes);
+      if (!realMime) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'O arquivo baixado não é uma imagem válida (JPG/PNG/WebP/AVIF).' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+        );
+      }
+
+      const ext = realMime.split('/')[1].replace('jpeg', 'jpg');
       const now = new Date();
       const baseName = slugify(String(body.titulo || 'capa-editorial')).slice(0, 48) || 'capa';
       const path = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${Date.now()}-${baseName}.${ext}`;
 
       const { error: upErr } = await client.storage
         .from('pautas-images')
-        .upload(path, bytes, { contentType, cacheControl: '31536000', upsert: false });
+        .upload(path, bytes, { contentType: realMime, cacheControl: '31536000', upsert: false });
 
       if (upErr) {
         return new Response(JSON.stringify({ ok: false, error: upErr.message }), {

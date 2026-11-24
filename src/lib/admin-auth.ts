@@ -4,6 +4,8 @@ import { getRuntimeEnv } from './env';
 
 export const ADMIN_COOKIE_NAME = 'op_admin_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TOKEN_REGEX = /^(\d{13})\.(\d{13})\.([a-f0-9]{64})$/;
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function toHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
@@ -42,19 +44,36 @@ export function getAdminApiKey(locals: unknown): string | undefined {
 }
 
 export async function createSessionToken(secret: string): Promise<string> {
-  const exp = String(Date.now() + SESSION_TTL_MS);
-  const sig = await hmacSign(`op-admin:${exp}`, secret);
-  return `${exp}.${sig}`;
+  const iat = Date.now();
+  const exp = iat + SESSION_TTL_MS;
+  const sig = await hmacSign(`op-admin:${iat}:${exp}`, secret);
+  return `${iat}.${exp}.${sig}`;
 }
 
 export async function verifySessionToken(token: string | undefined, secret: string): Promise<boolean> {
-  if (!token || !token.includes('.')) return false;
-  const [exp, sig] = token.split('.');
-  if (!exp || !sig) return false;
-  const expNum = Number(exp);
-  if (!Number.isFinite(expNum) || Date.now() > expNum) return false;
-  const expected = await hmacSign(`op-admin:${exp}`, secret);
+  if (!token) return false;
+  const match = token.match(TOKEN_REGEX);
+  if (!match) return false;
+  const iat = Number(match[1]);
+  const exp = Number(match[2]);
+  const sig = match[3];
+  const now = Date.now();
+  if (exp <= iat || exp - iat > SESSION_TTL_MS || now > exp || iat > now + 60_000) {
+    return false;
+  }
+  const expected = await hmacSign(`op-admin:${iat}:${exp}`, secret);
   return timingSafeEqual(sig, expected);
+}
+
+function isSameOriginRequest(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return true; // Same-origin navigations / non-browser clients without Origin
+  try {
+    const reqOrigin = new URL(request.url).origin;
+    return origin === reqOrigin;
+  } catch {
+    return false;
+  }
 }
 
 export async function isAdminAuthenticated(
@@ -62,11 +81,11 @@ export async function isAdminAuthenticated(
   cookies: AstroCookies,
   locals: unknown
 ): Promise<{ ok: boolean; via?: 'cookie' | 'api_key'; error?: string }> {
-  const apiKey = getAdminApiKey(locals);
   const authHeader = request.headers.get('authorization') || '';
-  if (apiKey && authHeader.toLowerCase().startsWith('bearer ')) {
+  if (authHeader.toLowerCase().startsWith('bearer ')) {
+    const apiKey = getAdminApiKey(locals);
     const provided = authHeader.slice(7).trim();
-    if (timingSafeEqual(provided, apiKey)) {
+    if (apiKey && timingSafeEqual(provided, apiKey)) {
       return { ok: true, via: 'api_key' };
     }
     return { ok: false, error: 'Bearer token inválido.' };
@@ -79,6 +98,9 @@ export async function isAdminAuthenticated(
 
   const cookieVal = cookies.get(ADMIN_COOKIE_NAME)?.value;
   if (await verifySessionToken(cookieVal, secret)) {
+    if (MUTATING_METHODS.has(request.method.toUpperCase()) && !isSameOriginRequest(request)) {
+      return { ok: false, error: 'Origem CSRF inválida.' };
+    }
     return { ok: true, via: 'cookie' };
   }
 
