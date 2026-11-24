@@ -231,7 +231,7 @@ if (client) {
 
     const FALLBACK_TEXT_MODELS = {
       gemini: ['gemini-3.8-flash', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-3.5-flash-lite'],
-      opencode_go: ['glm-5', 'kimi-k2.5', 'minimax-m2.5', 'deepseek-v3'],
+      opencode_go: ['deepseek-v4.1-flash', 'kimi-k2.5', 'minimax-m2.5'],
       opencode: ['big-pickle', 'minimax-m2.5-free', 'glm-5-free'],
       deepseek: ['deepseek-chat', 'deepseek-reasoner'],
       openrouter: ['google/gemini-3.8-flash', 'deepseek/deepseek-chat', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
@@ -319,7 +319,10 @@ if (client) {
         }
         const keep = data.models.includes(modelEl.value) ? modelEl.value : data.models[0];
         populateSelect(modelEl, data.models, keep);
-        modelStatusEl.textContent = `${data.models.length} modelos ativos carregados direto da sua chave de API.`;
+        modelStatusEl.textContent =
+          keep !== initialModel
+            ? `${data.models.length} modelos ativos carregados. Clique em "Salvar tudo" para gravar ${keep} no banco.`
+            : `${data.models.length} modelos ativos carregados direto da sua chave de API.`;
       } catch (err) {
         const fallback = FALLBACK_TEXT_MODELS[prov] || FALLBACK_TEXT_MODELS.gemini;
         populateSelect(modelEl, fallback, modelEl.value || fallback[0]);
