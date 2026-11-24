@@ -183,13 +183,26 @@ if (client) {
 
         <div id="image-key-wrap">
           <label for="image_api_key" class="block text-xs font-semibold text-black/70">
-            Chave dedicada para Imagem (opcional — Cloudflare Workers AI não precisa de chave)
+            Chave dedicada para Imagem IA (opcional — Cloudflare Workers AI não precisa de chave)
           </label>
           <input
             id="image_api_key"
             name="image_api_key"
             type="password"
             placeholder={current.has_image_key ? `Salva: ${current.masked_image_key} (deixe vazio para manter)` : 'Opcional (deixe vazio para Cloudflare grátis ou para reusar a chave acima)'}
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+
+        <div class="border-t border-black/10 pt-4">
+          <label for="pexels_api_key" class="block text-xs font-semibold text-black/70">
+            Chave Pexels API (GRÁTIS — fotos reais nível revista em 16:9 HD · <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer" class="underline text-[#D92B2B]">pegar grátis em 30s ↗</a>)
+          </label>
+          <input
+            id="pexels_api_key"
+            name="pexels_api_key"
+            type="password"
+            placeholder={maskedProviderKeys.pexels ? `Salva: ${maskedProviderKeys.pexels} (deixe vazio para manter)` : 'Cole sua chave gratuita do Pexels para ativar fotos editoriais HD'}
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           />
         </div>
@@ -290,6 +303,7 @@ if (client) {
       image_provider: imgProviderEl.value,
       image_model: imgModelEl.value,
       image_api_key: document.getElementById('image_api_key').value.trim(),
+      pexels_api_key: document.getElementById('pexels_api_key').value.trim(),
     });
 
     const setEmptyModelSelect = (msg) => {
@@ -371,6 +385,7 @@ if (client) {
         syncKeyPlaceholder();
         document.getElementById('search_api_key').value = '';
         document.getElementById('image_api_key').value = '';
+        document.getElementById('pexels_api_key').value = '';
       } else {
         showMsg(false, data.error || 'Erro ao salvar.');
       }

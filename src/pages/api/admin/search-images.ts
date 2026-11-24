@@ -12,8 +12,33 @@ import {
 } from '../../../lib/security';
 
 const FREE_LICENSES = ['cc0', 'public domain', 'cc by', 'cc-by', 'pd-'];
-const WIKIMEDIA_ALLOWED_HOSTS = ['upload.wikimedia.org', 'thumb.wikimedia.org', 'commons.wikimedia.org'];
+const ALLOWED_IMAGE_HOSTS = [
+  'images.pexels.com',
+  'upload.wikimedia.org',
+  'thumb.wikimedia.org',
+  'commons.wikimedia.org',
+];
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+
+function translatePtQuery(q: string): string {
+  const normalized = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const dict: Record<string, string> = {
+    ciberseguranca: 'cybersecurity',
+    seguranca: 'cybersecurity technology',
+    'inteligencia artificial': 'artificial intelligence technology',
+    ia: 'artificial intelligence',
+    tecnologia: 'modern technology',
+    negocios: 'modern business office technology',
+    empresa: 'corporate office laptop',
+    celular: 'smartphone technology',
+    golpe: 'cybersecurity digital lock',
+    privacidade: 'digital privacy cybersecurity',
+    servidor: 'data center server',
+    trabalho: 'modern workspace laptop',
+    robo: 'robot technology',
+  };
+  return dict[normalized] || q.trim();
+}
 
 function stripTags(html?: string): string {
   return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -28,7 +53,7 @@ function isCommercialFreeLicense(license: string): boolean {
 }
 
 function buildSearchTerms(titulo: string, trilha: string, customQuery?: string): string[] {
-  if (customQuery?.trim()) return [customQuery.trim()];
+  if (customQuery?.trim()) return [translatePtQuery(customQuery)];
   const lower = `${titulo} ${trilha}`.toLowerCase();
   const map: [RegExp, string[]][] = [
     [/openai|chatgpt|gpt/, ['artificial intelligence', 'data center', 'server room']],
@@ -70,7 +95,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       }
 
       const safeUrl = assertSafeExternalUrl(String(body.importUrl), {
-        allowHosts: WIKIMEDIA_ALLOWED_HOSTS,
+        allowHosts: ALLOWED_IMAGE_HOSTS,
       });
 
       const imgRes = await fetch(safeUrl.toString(), {
@@ -117,10 +142,68 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       });
     }
 
-    // Mode 1: Search commercial-free landscape high-res photos on Wikimedia Commons (with automatic fallback queries)
+    // Mode 1: Prefer Pexels API (high-craft free editorial landscape photography) if configured, else Wikimedia Commons
     const titulo = String(body?.titulo || '').trim();
     const trilha = String(body?.trilha || 'ia').trim();
     const queries = buildSearchTerms(titulo, trilha, body?.query);
+
+    const { client } = getServiceSupabase(locals);
+    let pexelsKey = '';
+    if (client) {
+      const { data: cfg } = await client
+        .from('admin_settings')
+        .select('provider_keys')
+        .eq('id', 'default')
+        .maybeSingle();
+      const vault = (cfg?.provider_keys as Record<string, string> | null) || {};
+      pexelsKey = vault.pexels?.trim() || '';
+    }
+
+    if (pexelsKey) {
+      const q = queries[0];
+      const pxUrl = new URL('https://api.pexels.com/v1/search');
+      pxUrl.searchParams.set('query', q);
+      pxUrl.searchParams.set('orientation', 'landscape');
+      pxUrl.searchParams.set('size', 'large');
+      pxUrl.searchParams.set('per_page', '9');
+
+      const pxRes = await fetch(pxUrl.toString(), {
+        signal: AbortSignal.timeout(8000),
+        headers: { Authorization: pexelsKey },
+      });
+
+      if (pxRes.ok) {
+        const pxData = (await pxRes.json()) as {
+          photos?: {
+            width: number;
+            height: number;
+            photographer: string;
+            alt?: string;
+            src: { large2x?: string; landscape?: string; original?: string };
+          }[];
+        };
+        const results = (pxData.photos || [])
+          .filter((p) => p.width >= 1200 && p.width > p.height)
+          .slice(0, 6)
+          .map((p) => ({
+            title: p.alt || titulo || q,
+            url: p.src.large2x || p.src.landscape || p.src.original || '',
+            width: p.width,
+            height: p.height,
+            license: 'Pexels Free',
+            credit: `Foto: ${p.photographer} / Pexels`,
+            suggestedAlt: titulo ? `Imagem editorial da pauta: ${titulo}` : p.alt || q,
+          }))
+          .filter((r) => Boolean(r.url));
+
+        if (results.length > 0) {
+          return new Response(JSON.stringify({ ok: true, query: q, source: 'pexels', results }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
+          });
+        }
+      }
+    }
 
     const searchWikimedia = async (q: string) => {
       const apiUrl = new URL('https://commons.wikimedia.org/w/api.php');
