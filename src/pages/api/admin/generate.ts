@@ -57,12 +57,26 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       ? body.source_urls.filter((u: unknown) => typeof u === 'string' && u.trim())
       : [];
 
+    const { data: publishedRows } = await client
+      .from('pautas')
+      .select('titulo, slug, trilha')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(10);
+
+    const existingPautas = (publishedRows || []).map((r) => ({
+      titulo: r.titulo,
+      slug: r.slug,
+      trilha: r.trilha,
+    }));
+
     const { draft, webSearchUsed } = await generatePautaDraft(settings as AiSettings, {
       topic,
       trilha,
       foco,
       sourceUrls,
       useWebSearch,
+      existingPautas,
     });
 
     return new Response(JSON.stringify({ ok: true, draft, webSearchUsed }), {

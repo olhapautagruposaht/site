@@ -17,6 +17,31 @@ const nextPauta = allPautas.length > 1 ? allPautas[(currentIndex + 1) % allPauta
 const relatedPautas = allPautas
   .filter((p) => p.slug !== pauta.slug && p.slug !== nextPauta?.slug)
   .slice(0, 2);
+const inlineReadMore =
+  allPautas.find((p) => p.slug !== pauta.slug && p.trilha === pauta.trilha) || nextPauta;
+
+const escapeHtmlText = (str: string) =>
+  str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// XSS-safe rich paragraph renderer: escapes all HTML first, then converts only verified internal (/pauta/...) and HTTPS Markdown links
+const renderRichText = (text: string) => {
+  const escaped = escapeHtmlText(text);
+  return escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, rawHref: string) => {
+    const href = rawHref.trim();
+    if (href.startsWith('/pauta/') || href.startsWith('/pautas/')) {
+      return `<a href="${href}" data-astro-prefetch="viewport" class="font-medium underline decoration-[var(--color-accent)]/60 underline-offset-4 hover:decoration-[var(--color-accent)]">${label}</a>`;
+    }
+    if (href.startsWith('https://')) {
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4 hover:opacity-75">${label}</a>`;
+    }
+    return label;
+  });
+};
 
 Astro.response.headers.set(
   'Cache-Control',
@@ -401,12 +426,12 @@ const jsonLd = {
         {pauta.conteudo.map((section, idx) => (
           <section id={section.heading ? `secao-${idx + 1}` : undefined} class="scroll-mt-24">
             {section.heading && <h2>{section.heading}</h2>}
-            {section.paragraphs.map((p) => <p>{p}</p>)}
+            {section.paragraphs.map((p) => <p set:html={renderRichText(p)} />)}
 
             {section.subsections && section.subsections.map((sub) => (
               <div class="mt-6">
                 {sub.heading && <h3>{sub.heading}</h3>}
-                {sub.paragraphs.map((sp) => <p>{sp}</p>)}
+                {sub.paragraphs.map((sp) => <p set:html={renderRichText(sp)} />)}
               </div>
             ))}
 
@@ -414,21 +439,33 @@ const jsonLd = {
 
             {section.callout && (
               <div class="my-8 rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5 sm:p-6">
-                <p class="!mb-0 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
-                  {section.callout.text}
-                </p>
+                <p class="!mb-0 text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]" set:html={renderRichText(section.callout.text)} />
               </div>
             )}
 
             {section.bullets && (
               <ul>
-                {section.bullets.map((b) => <li>{b}</li>)}
+                {section.bullets.map((b) => <li set:html={renderRichText(b)} />)}
               </ul>
             )}
 
-            {/* AdSense In-Article Slots spaced apart (never stacked) */}
+            {/* AdSense In-Article Slots spaced apart (never stacked) + Inline Internal Link Card */}
             {idx === 0 && pauta.conteudo.length > 1 && (
               <AdSlot slotName="in-article-1" slotId="2862621926" format="in-article" minHeight="min-h-[250px]" />
+            )}
+            {idx === 1 && inlineReadMore && pauta.conteudo.length > 2 && (
+              <aside aria-label="Leia também" class="not-prose my-8 rounded-2xl border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                  Leia também
+                </p>
+                <a
+                  href={`/pauta/${inlineReadMore.slug}`}
+                  data-astro-prefetch="viewport"
+                  class="mt-1.5 block text-[16px] font-bold leading-snug text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-75 transition-opacity"
+                >
+                  {inlineReadMore.titulo} →
+                </a>
+              </aside>
             )}
             {idx === 2 && pauta.conteudo.length > 3 && (
               <AdSlot slotName="in-article-2" slotId="3258385356" format="in-article" minHeight="min-h-[250px]" />

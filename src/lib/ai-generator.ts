@@ -54,8 +54,11 @@ REGRAS OBRIGATÓRIAS (NUNCA VIOLE):
 2. PROIBIDO usar travessão (— ou –) em qualquer lugar do JSON. Use vírgula, dois-pontos ou ponto final.
 3. PROIBIDO usar clichês de IA ("no cenário atual", "é importante ressaltar", "em suma", "mergulhar fundo", "revolucionário", "divisor de águas", emojis).
 4. Baseie-se estritamente em fatos reais e atualizados (use os dados pesquisados na web e fontes fornecidas). Nunca invente estatísticas ou citações falsas.
-5. Estrutura para Google Discover, Google Search, AIO (AI Overviews) e GEO (ChatGPT/Perplexity):
-   - Título (H1): 55 a 85 caracteres, forte, humano, sem clickbait enganoso.
+5. Auto-linkagem interna e externa (SEO, E-E-A-T e retenção):
+   - Se forem fornecidas "PAUTAS JÁ PUBLICADAS NO OLHAPAUTA", insira naturalmente 1 a 2 links internos no meio dos parágrafos usando Markdown: [texto âncora natural](/pauta/slug-exato). NUNCA invente slugs que não estejam na lista.
+   - Insira naturalmente 1 a 2 links externos reais no meio dos parágrafos usando Markdown: [Nome da Fonte](https://url-exata) usando APENAS URLs reais vindas da pesquisa web ou das fontes fornecidas. NUNCA invente URLs.
+6. Estrutura para Google Discover, Google Search, AIO (AI Overviews) e GEO (ChatGPT/Perplexity):
+   - Título (H1): 55 a 85 caracteres, provocativo, humano e com tensão real ou curiosidade genuína, 100% entregue no texto (sem clickbait enganoso e sem jargão corporativo obscuro).
    - Subtítulo: 120 a 190 caracteres respondendo o valor da pauta.
    - Resumo curto: 1 a 2 frases claras para cards.
    - TL;DR ("O que você precisa saber"): exatamente 3 pontos objetivos.
@@ -405,19 +408,33 @@ export async function discoverTrendingTopics(
   let tavilyContext = '';
   let webSearchUsed = 'none';
   if (settings.search_api_key && settings.ai_provider !== 'gemini') {
-    const tv = await searchWithTavily(
-      settings.search_api_key,
-      `novidades inteligência artificial tecnologia cibersegurança hoje ${today} Brasil`
-    );
-    tavilyContext = tv.context;
-    if (tv.context) webSearchUsed = 'tavily';
+    // 3 parallel broad-appeal searches so the 5 cards cover high-volume Discover + high-RPM Search
+    const [q1, q2, q3] = await Promise.all([
+      searchWithTavily(
+        settings.search_api_key,
+        `novidades inteligência artificial ChatGPT Gemini Claude OpenAI Apple Google hoje ${today} Brasil`
+      ),
+      searchWithTavily(
+        settings.search_api_key,
+        `WhatsApp Android iPhone golpe IA deepfake celular Brasil novidade ${today}`
+      ),
+      searchWithTavily(
+        settings.search_api_key,
+        `ferramentas IA gratuitas produtividade trabalho negócios tecnologia Brasil ${today}`
+      ),
+    ]);
+    tavilyContext = [q1.context, q2.context, q3.context].filter(Boolean).join('\n\n---\n\n');
+    if (tavilyContext) webSearchUsed = 'tavily-multi';
   }
 
   const prompt = `Data de hoje: ${today}.
-Você é o editor de pautas do OlhaPauta (olhapauta.com.br). Pesquise o que está EM ALTA HOJE em Inteligência Artificial, Tecnologia, Cibersegurança, Negócios de IA e Guias práticos com forte potencial de cliques no Google Discover e Google Search no Brasil.
+Você é o editor de crescimento e Google Discover do OlhaPauta (olhapauta.com.br). Pesquise o que está EM ALTA HOJE com potencial REAL de explodir em cliques no Google Discover e Google Search no Brasil.
 ${trilhaHint}
 ${tavilyContext ? `\nNOTÍCIAS E TENDÊNCIAS DE HOJE:\n${tavilyContext}\n` : ''}
-Sugira exatamente 5 pautas quentes e concretas (proibido temas genéricos, proibido travessões — ou –, foco no público brasileiro).
+REGRAS PARA AS 5 PAUTAS (OBRIGATÓRIO):
+- Distribua 1 pauta por editoria (ia, tecnologia, seguranca, negocios, guias), misturando 3 com foco "discover" e 2 com foco "search".
+- PROIBIDO jargão corporativo obscuro no título (nada de "SOC", "CISO", "SIEM"). Escreva para milhões de brasileiros conectados que usam celular, WhatsApp, trabalho digital e ferramentas de IA.
+- Títulos PROVOCATIVOS, com curiosidade real, impacto no bolso, na privacidade ou na rotina — 100% honestos e dentro das políticas do Google Discover (nunca clickbait mentiroso, nunca travessão — ou –).
 
 RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
 {
@@ -425,9 +442,9 @@ RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
     {
       "trilha": "ia | tecnologia | seguranca | negocios | guias",
       "foco": "discover | search",
-      "titulo": "Título forte de 55 a 80 caracteres sem travessão",
+      "titulo": "Título provocativo e claro de 55 a 82 caracteres sem travessão",
       "angulo": "Resumo em 1 frase do ângulo concreto que a matéria vai abordar",
-      "motivo": "Por que isso está em alta e vai performar bem no Discover ou Search",
+      "motivo": "Por que isso vai explodir em cliques no Discover ou ranquear no Search",
       "source_urls": ["https://..."]
     }
   ]
@@ -470,6 +487,7 @@ export async function generatePautaDraft(
     foco: 'discover' | 'search';
     sourceUrls?: string[];
     useWebSearch?: boolean;
+    existingPautas?: { titulo: string; slug: string; trilha: string }[];
   }
 ): Promise<{ draft: Partial<PautaPayload>; webSearchUsed: string }> {
   const focoInstrucao =
@@ -496,9 +514,18 @@ export async function generatePautaDraft(
     webSearchUsed = 'tavily';
   }
 
+  const internalLinksBlock =
+    input.existingPautas && input.existingPautas.length > 0
+      ? `PAUTAS JÁ PUBLICADAS NO OLHAPAUTA (use 1 a 2 em links internos Markdown [âncora](/pauta/slug) onde fizer sentido):\n${input.existingPautas
+          .slice(0, 8)
+          .map((ep) => `- ${ep.titulo} -> /pauta/${ep.slug} (${ep.trilha})`)
+          .join('\n')}`
+      : '';
+
   const contextBlocks = [
     tavilyContext ? `PESQUISA WEB EM TEMPO REAL:\n${tavilyContext}` : '',
     fetchedRefs ? `CONTEÚDO DOS LINKS DE REFERÊNCIA:\n${fetchedRefs}` : '',
+    internalLinksBlock,
   ]
     .filter(Boolean)
     .join('\n\n');
