@@ -19,8 +19,8 @@ let current = {
   masked_api_key: '',
   has_search_key: false,
   masked_search_key: '',
-  image_provider: 'auto',
-  image_model: 'imagen-3.0-generate-002',
+  image_provider: 'cloudflare',
+  image_model: '@cf/black-forest-labs/flux-1-schnell',
   has_image_key: false,
   masked_image_key: '',
 };
@@ -36,8 +36,8 @@ if (client) {
       masked_api_key: mask(data.ai_api_key),
       has_search_key: Boolean(data.search_api_key),
       masked_search_key: mask(data.search_api_key),
-      image_provider: data.image_provider || 'auto',
-      image_model: data.image_model || 'imagen-3.0-generate-002',
+      image_provider: data.image_provider || 'cloudflare',
+      image_model: data.image_model || '@cf/black-forest-labs/flux-1-schnell',
       has_image_key: Boolean(data.image_api_key),
       masked_image_key: mask(data.image_api_key),
     };
@@ -52,7 +52,7 @@ if (client) {
         Minha IA (Texto, Busca Web & Capa 16:9)<span class="text-[#D92B2B]">.</span>
       </h1>
       <p class="mt-1.5 text-sm text-black/60">
-        Conecte sua própria API para redigir com busca web ao vivo e gerar capas originais 16:9 direto no editor.
+        Conecte sua própria API para pesquisar tendências ao vivo, redigir no framework e gerar capas 16:9 sem digitar nomes de modelos na mão.
       </p>
     </div>
 
@@ -68,35 +68,13 @@ if (client) {
             name="ai_provider"
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           >
-            <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (Gemini 3.8 / 4 + Busca Google nativa)</option>
+            <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (inclui Busca Google nativa)</option>
             <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-6.2 / GPT-6.1)</option>
             <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet 5.5 / Opus 5.5 / Fable 5.2)</option>
             <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 4.7)</option>
             <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos)</option>
             <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
           </select>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between gap-2">
-            <label for="ai_model" class="block text-xs font-semibold text-black/70">Modelo (texto livre ou clique em buscar)</label>
-            <button
-              id="btn-list-models"
-              type="button"
-              class="text-xs font-semibold text-[#D92B2B] hover:underline cursor-pointer"
-            >
-              ↻ Buscar modelos ativos na API
-            </button>
-          </div>
-          <input
-            id="ai_model"
-            name="ai_model"
-            type="text"
-            value={current.ai_model}
-            placeholder="ex: gemini-3.8-flash, gemini-4-neon, claude-sonnet-5-5, gpt-6.2-sol, grok-4.7"
-            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-          />
-          <div id="live-models-wrap" class="mt-2 hidden flex flex-wrap gap-1.5"></div>
         </div>
 
         <div id="custom-url-wrap" class={current.ai_provider === 'custom' ? '' : 'hidden'}>
@@ -121,13 +99,32 @@ if (client) {
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           />
         </div>
+
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <label for="ai_model" class="block text-xs font-semibold text-black/70">Modelo disponível no provedor</label>
+            <button
+              id="btn-list-models"
+              type="button"
+              class="text-xs font-semibold text-[#D92B2B] hover:underline cursor-pointer"
+            >
+              ↻ Atualizar lista da API
+            </button>
+          </div>
+          <select
+            id="ai_model"
+            name="ai_model"
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          ></select>
+          <p id="model-list-status" class="mt-1.5 text-[11px] text-black/50"></p>
+        </div>
       </section>
 
       <!-- 2. Live Web Search -->
       <section class="rounded-3xl border border-black/10 bg-white p-7 space-y-3">
         <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">2. Busca Web ao Vivo</h2>
         <p class="text-xs text-black/60 leading-relaxed">
-          Se você usa <strong>Google Gemini</strong>, a busca ao vivo no Google já funciona <strong>nativamente sem precisar de chave extra</strong>.
+          Com <strong>Google Gemini</strong>, a busca ao vivo no Google já funciona <strong>nativamente sem precisar de chave extra</strong>.
           Para OpenAI, Claude, Grok ou OpenRouter, você pode adicionar uma chave gratuita do <strong>Tavily</strong> (1.000 buscas/mês grátis) ou colar links de referência direto no editor.
         </p>
         <div>
@@ -155,36 +152,32 @@ if (client) {
               class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm"
             >
               <option value="cloudflare" selected={current.image_provider === 'cloudflare'}>Cloudflare Workers AI (GRÁTIS · sem chave!)</option>
-              <option value="huggingface" selected={current.image_provider === 'huggingface'}>Hugging Face (Grátis · FLUX.1 16:9 · token hf_...)</option>
-              <option value="fal" selected={current.image_provider === 'fal'}>fal.ai (FLUX Schnell / Pro · 16:9 baratinho)</option>
+              <option value="huggingface" selected={current.image_provider === 'huggingface'}>Hugging Face (Grátis · FLUX.1 16:9)</option>
+              <option value="fal" selected={current.image_provider === 'fal'}>fal.ai (FLUX Schnell / Pro · 16:9)</option>
               <option value="gemini" selected={current.image_provider === 'gemini'}>Google Imagen / Gemini Image</option>
-              <option value="openai" selected={current.image_provider === 'openai'}>OpenAI (gpt-image-1 / dall-e-3)</option>
-              <option value="auto" selected={current.image_provider === 'auto'}>Automático (usa o mesmo da redação)</option>
+              <option value="openai" selected={current.image_provider === 'openai'}>OpenAI (GPT Image 2.6)</option>
             </select>
           </div>
 
           <div>
             <label for="image_model" class="block text-xs font-semibold text-black/70">Modelo de Imagem</label>
-            <input
+            <select
               id="image_model"
               name="image_model"
-              type="text"
-              value={current.image_model}
-              placeholder="imagen-3.0-generate-002 ou gpt-image-1"
               class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm"
-            />
+            ></select>
           </div>
         </div>
 
-        <div>
+        <div id="image-key-wrap">
           <label for="image_api_key" class="block text-xs font-semibold text-black/70">
-            Chave dedicada para Imagem (opcional — deixe vazio para reusar a chave de cima)
+            Chave dedicada para Imagem (opcional — Cloudflare Workers AI não precisa de chave)
           </label>
           <input
             id="image_api_key"
             name="image_api_key"
             type="password"
-            placeholder={current.has_image_key ? `Salva: ${current.masked_image_key} (deixe vazio para manter)` : 'Opcional (se quiser usar Gemini para imagem e Claude para texto)'}
+            placeholder={current.has_image_key ? `Salva: ${current.masked_image_key} (deixe vazio para manter)` : 'Opcional (deixe vazio para Cloudflare grátis ou para reusar a chave acima)'}
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           />
         </div>
@@ -211,67 +204,101 @@ if (client) {
     </form>
   </div>
 
-  <script is:inline>
+  <script define:vars={{ initialModel: current.ai_model, initialImageModel: current.image_model, hasSavedKey: current.has_api_key }}>
     const providerEl = document.getElementById('ai_provider');
     const modelEl = document.getElementById('ai_model');
+    const modelStatusEl = document.getElementById('model-list-status');
     const imgProviderEl = document.getElementById('image_provider');
     const imgModelEl = document.getElementById('image_model');
+    const imgKeyWrap = document.getElementById('image-key-wrap');
     const baseUrlWrap = document.getElementById('custom-url-wrap');
+    const apiKeyEl = document.getElementById('ai_api_key');
     const fb = document.getElementById('settings-feedback');
 
-    const defaultModels = {
-      gemini: 'gemini-3.8-flash',
-      openai: 'gpt-6.2-sol',
-      anthropic: 'claude-sonnet-5-5',
-      grok: 'grok-4.7',
-      openrouter: 'google/gemini-3.8-flash',
-      custom: 'gemini-3.8-flash',
+    const FALLBACK_TEXT_MODELS = {
+      gemini: ['gemini-3.8-flash', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-3.5-flash-lite'],
+      openai: ['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra'],
+      anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2', 'claude-haiku-5-5'],
+      grok: ['grok-4.7', 'grok-4.20'],
+      openrouter: ['google/gemini-3.8-flash', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
+      custom: ['gemini-3.8-flash', 'gpt-6.2-sol'],
     };
 
-    providerEl?.addEventListener('change', () => {
-      const p = providerEl.value;
-      baseUrlWrap.classList.toggle('hidden', p !== 'custom');
-      if (defaultModels[p]) modelEl.value = defaultModels[p];
-    });
+    const IMAGE_MODELS = {
+      cloudflare: [
+        { id: '@cf/black-forest-labs/flux-1-schnell', label: 'FLUX.1 Schnell (Grátis · rápido)' },
+        { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0', label: 'SDXL Base 1.0 (Grátis · 16:9 nativo)' },
+      ],
+      huggingface: [
+        { id: 'black-forest-labs/FLUX.1-schnell', label: 'FLUX.1 Schnell (Grátis · 1280×720 16:9)' },
+        { id: 'black-forest-labs/FLUX.1-dev', label: 'FLUX.1 Dev (1280×720 16:9)' },
+      ],
+      fal: [
+        { id: 'fal-ai/flux/schnell', label: 'FLUX Schnell (~US$ 0,003 · 16:9)' },
+        { id: 'fal-ai/flux-pro/v1.1', label: 'FLUX Pro v1.1 (fotográfico · 16:9)' },
+      ],
+      gemini: [
+        { id: 'gemini-2.5-flash-image', label: 'Gemini Flash Image (nativo)' },
+        { id: 'imagen-3.0-generate-002', label: 'Imagen 3 (16:9 · requer faturamento GCP)' },
+      ],
+      openai: [
+        { id: 'gpt-image-2.6-sunburst', label: 'GPT Image 2.6 Sunburst (16:9)' },
+        { id: 'gpt-image-2.6-flare', label: 'GPT Image 2.6 Flare (16:9)' },
+      ],
+    };
 
-    imgProviderEl?.addEventListener('change', () => {
-      const map = {
-        cloudflare: '@cf/black-forest-labs/flux-1-schnell',
-        huggingface: 'black-forest-labs/FLUX.1-schnell',
-        fal: 'fal-ai/flux/schnell',
-        gemini: 'gemini-2.5-flash-image',
-        openai: 'gpt-image-2.6-sunburst',
-      };
-      if (map[imgProviderEl.value]) imgModelEl.value = map[imgProviderEl.value];
-    });
-
-    document.getElementById('btn-list-models')?.addEventListener('click', async () => {
-      const wrap = document.getElementById('live-models-wrap');
-      showMsg(true, 'Consultando modelos ativos na sua chave de API...');
-      const res = await fetch('/api/admin/models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getBody()),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        showMsg(false, data.error || 'Não foi possível listar modelos.');
-        return;
+    const populateSelect = (selectEl, items, preferred) => {
+      const normalized = items.map((it) => (typeof it === 'string' ? { id: it, label: it } : it));
+      if (preferred && !normalized.some((x) => x.id === preferred)) {
+        normalized.unshift({ id: preferred, label: `${preferred} (atual)` });
       }
-      wrap.innerHTML = (data.models || [])
-        .map(
-          (id) =>
-            `<button type="button" data-pick-model="${id}" class="rounded-full border border-black/15 bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-mono hover:bg-black hover:text-white transition-colors cursor-pointer">${id}</button>`
-        )
+      selectEl.innerHTML = normalized
+        .map((x) => `<option value="${x.id}" ${x.id === preferred ? 'selected' : ''}>${x.label}</option>`)
         .join('');
-      wrap.classList.remove('hidden');
-      wrap.querySelectorAll('[data-pick-model]').forEach((b) => {
-        b.addEventListener('click', () => {
-          modelEl.value = b.dataset.pickModel;
-        });
-      });
-      showMsg(true, `${data.models.length} modelos ativos carregados! Clique em um chip para selecionar.`);
+    };
+
+    const populateImageModels = (preferred) => {
+      const prov = imgProviderEl.value;
+      const list = IMAGE_MODELS[prov] || IMAGE_MODELS.cloudflare;
+      populateSelect(imgModelEl, list, preferred || list[0].id);
+      imgKeyWrap.classList.toggle('hidden', prov === 'cloudflare');
+    };
+
+    const getBody = () => ({
+      ai_provider: providerEl.value,
+      ai_model: modelEl.value,
+      ai_base_url: document.getElementById('ai_base_url').value.trim(),
+      ai_api_key: apiKeyEl.value.trim(),
+      search_api_key: document.getElementById('search_api_key').value.trim(),
+      image_provider: imgProviderEl.value,
+      image_model: imgModelEl.value,
+      image_api_key: document.getElementById('image_api_key').value.trim(),
     });
+
+    const loadLiveModels = async (silent = false) => {
+      const prov = providerEl.value;
+      if (!silent) modelStatusEl.textContent = 'Buscando modelos disponíveis direto na API do provedor...';
+      try {
+        const res = await fetch('/api/admin/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getBody()),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !Array.isArray(data.models) || data.models.length === 0) {
+          throw new Error(data.error || 'Lista indisponível');
+        }
+        const keep = data.models.includes(modelEl.value) ? modelEl.value : data.models[0];
+        populateSelect(modelEl, data.models, keep);
+        modelStatusEl.textContent = `${data.models.length} modelos ativos carregados direto da sua chave de API.`;
+      } catch (err) {
+        const fallback = FALLBACK_TEXT_MODELS[prov] || FALLBACK_TEXT_MODELS.gemini;
+        populateSelect(modelEl, fallback, modelEl.value || fallback[0]);
+        if (!silent) {
+          modelStatusEl.textContent = `Usando lista padrão (${err.message || 'cole sua API Key e clique em Atualizar'}).`;
+        }
+      }
+    };
 
     const showMsg = (ok, text) => {
       fb.textContent = text;
@@ -280,18 +307,22 @@ if (client) {
       }`;
     };
 
-    const getBody = () => ({
-      ai_provider: providerEl.value,
-      ai_model: modelEl.value.trim(),
-      ai_base_url: document.getElementById('ai_base_url').value.trim(),
-      ai_api_key: document.getElementById('ai_api_key').value.trim(),
-      search_api_key: document.getElementById('search_api_key').value.trim(),
-      image_provider: imgProviderEl.value,
-      image_model: imgModelEl.value.trim(),
-      image_api_key: document.getElementById('image_api_key').value.trim(),
+    providerEl.addEventListener('change', () => {
+      const p = providerEl.value;
+      baseUrlWrap.classList.toggle('hidden', p !== 'custom');
+      const fallback = FALLBACK_TEXT_MODELS[p] || FALLBACK_TEXT_MODELS.gemini;
+      populateSelect(modelEl, fallback, fallback[0]);
+      if (apiKeyEl.value.trim() || hasSavedKey) loadLiveModels(true);
     });
 
-    document.getElementById('ai-settings-form')?.addEventListener('submit', async (e) => {
+    apiKeyEl.addEventListener('change', () => {
+      if (apiKeyEl.value.trim().length > 10) loadLiveModels(false);
+    });
+
+    imgProviderEl.addEventListener('change', () => populateImageModels());
+    document.getElementById('btn-list-models').addEventListener('click', () => loadLiveModels(false));
+
+    document.getElementById('ai-settings-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       showMsg(true, 'Salvando configurações...');
       const res = await fetch('/api/admin/settings', {
@@ -301,8 +332,8 @@ if (client) {
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        showMsg(true, 'Configurações salvas! Busca web ao vivo e gerador de capa 16:9 prontos no Editor.');
-        document.getElementById('ai_api_key').value = '';
+        showMsg(true, 'Configurações salvas! Tudo pronto para gerar pautas e capas no Editor.');
+        apiKeyEl.value = '';
         document.getElementById('search_api_key').value = '';
         document.getElementById('image_api_key').value = '';
       } else {
@@ -310,8 +341,8 @@ if (client) {
       }
     });
 
-    document.getElementById('test-ai-btn')?.addEventListener('click', async () => {
-      showMsg(true, 'Testando conexão com a API...');
+    document.getElementById('test-ai-btn').addEventListener('click', async () => {
+      showMsg(true, 'Testando conexão com o modelo selecionado...');
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -319,10 +350,15 @@ if (client) {
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        showMsg(true, `Conexão OK! Resposta: ${data.reply || 'ok'}`);
+        showMsg(true, `Conexão OK com ${modelEl.value}! Resposta: ${data.reply || 'ok'}`);
       } else {
         showMsg(false, `Falha no teste: ${data.error || 'Verifique a chave e o modelo.'}`);
       }
     });
+
+    // Initial hydration
+    populateSelect(modelEl, FALLBACK_TEXT_MODELS[providerEl.value] || FALLBACK_TEXT_MODELS.gemini, initialModel);
+    populateImageModels(initialImageModel);
+    if (hasSavedKey) loadLiveModels(true);
   </script>
 </AdminLayout>
