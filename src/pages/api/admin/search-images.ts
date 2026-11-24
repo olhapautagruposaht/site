@@ -195,6 +195,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         const pbData = (await pbRes.json()) as {
           hits?: {
             largeImageURL?: string;
+            webformatURL?: string;
+            previewURL?: string;
             imageWidth?: number;
             imageHeight?: number;
             user?: string;
@@ -212,15 +214,24 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
             }
           })
           .slice(0, 6)
-          .map((h) => ({
-            title: h.tags || titulo || q,
-            url: h.largeImageURL || '',
-            width: h.imageWidth || 1280,
-            height: h.imageHeight || 720,
-            license: 'Pixabay Free',
-            credit: `Foto: ${h.user || 'Pixabay'} / Pixabay`,
-            suggestedAlt: titulo ? `Imagem editorial da pauta: ${titulo}` : h.tags || q,
-          }));
+          .map((h) => {
+            const shortTags = (h.tags || '')
+              .split(',')
+              .map((t) => t.trim())
+              .filter(Boolean)
+              .slice(0, 3)
+              .join(', ');
+            return {
+              title: shortTags || titulo || q,
+              url: h.largeImageURL || '',
+              thumbUrl: h.webformatURL || h.previewURL || h.largeImageURL || '',
+              width: h.imageWidth || 1280,
+              height: h.imageHeight || 720,
+              license: 'Pixabay Free',
+              credit: `Foto: ${h.user || 'Pixabay'} / Pixabay`,
+              suggestedAlt: titulo ? `Imagem editorial da pauta: ${titulo}` : shortTags || q,
+            };
+          });
         if (results.length > 0) {
           return new Response(JSON.stringify({ ok: true, query: q, source: 'pixabay', results }), {
             status: 200,

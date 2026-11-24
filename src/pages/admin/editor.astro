@@ -44,6 +44,21 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
 ---
 
 <AdminLayout title={editId ? 'Editar Pauta' : 'Nova Pauta'} activeNav="editor">
+  <!-- Floating Live Production Pill (animated OlhaPauta red dot) -->
+  <div
+    id="op-working-pill"
+    class="fixed top-4 left-1/2 z-50 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-white/15 bg-[#1D1D1F] px-5 py-2.5 text-xs font-medium text-white shadow-2xl"
+    role="status"
+    aria-live="polite"
+  >
+    <span class="inline-flex items-center font-bold tracking-tight text-white">
+      olhapauta<span class="relative ml-0.5 inline-flex h-2.5 w-2.5 items-center justify-center"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D92B2B] opacity-80"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-[#D92B2B]"></span></span>
+    </span>
+    <span class="h-3.5 w-px bg-white/20"></span>
+    <span id="op-working-text" class="max-w-[260px] truncate sm:max-w-[420px]">Produzindo pauta...</span>
+    <span id="op-working-timer" class="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] text-white/80">00:00</span>
+  </div>
+
   <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
       <a href="/admin" class="text-xs font-medium text-black/50 hover:text-black">← Voltar para pautas</a>
@@ -951,7 +966,9 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
             data-pick-photo="${idx}"
             class="group overflow-hidden rounded-xl border border-black/10 bg-white text-left hover:border-black transition-colors cursor-pointer"
           >
-            <img src="${escHtml(img.url)}" alt="${escHtml(img.title)}" loading="lazy" class="aspect-[16/9] w-full object-cover group-hover:scale-[1.03] transition-transform" />
+            <div class="aspect-[16/9] w-full overflow-hidden bg-black/5">
+              <img src="${escHtml(img.thumbUrl || img.url)}" alt="${escHtml(String(img.title || 'Foto livre').slice(0, 60))}" referrerpolicy="no-referrer" loading="lazy" class="h-full w-full object-cover group-hover:scale-[1.03] transition-transform" />
+            </div>
             <div class="p-2">
               <p class="truncate text-[10px] font-semibold text-[#1D1D1F]">${escHtml(img.license)} · ${Number(img.width)}×${Number(img.height)}</p>
               <p class="truncate text-[10px] text-black/50">${escHtml(img.credit)}</p>
@@ -1002,6 +1019,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
       btn.textContent = 'Gerando capa...';
       st.textContent = 'Gerando imagem editorial 16:9 e salvando no Supabase Storage...';
       st.classList.remove('hidden');
+      showWorkingPill('Gerando capa 16:9 com IA...');
 
       try {
         const res = await fetch('/api/admin/generate-image', {
@@ -1023,18 +1041,60 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
       } catch (err) {
         st.textContent = `Erro ao gerar capa: ${err.message || 'verifique sua chave em Minha IA (API)'}`;
       } finally {
+        hideWorkingPill();
         btn.disabled = false;
         btn.textContent = '✦ Gerar capa 16:9 com IA';
       }
     });
 
-    const runFullGeneration = async ({ topic, trilha, foco, sourceUrls }) => {
+    let workingTimerInterval = null;
+    let workingStartMs = 0;
+
+    const showWorkingPill = (message) => {
+      const pill = $('op-working-pill');
+      const txt = $('op-working-text');
+      const timerEl = $('op-working-timer');
+      if (!pill || !txt) return;
+      txt.textContent = message;
+      pill.classList.remove('hidden');
+      pill.classList.add('flex');
+      if (!workingTimerInterval) {
+        workingStartMs = Date.now();
+        if (timerEl) timerEl.textContent = '00:00';
+        workingTimerInterval = setInterval(() => {
+          const sec = Math.floor((Date.now() - workingStartMs) / 1000);
+          const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+          const ss = String(sec % 60).padStart(2, '0');
+          if (timerEl) timerEl.textContent = `${mm}:${ss}`;
+        }, 1000);
+      }
+    };
+
+    const hideWorkingPill = () => {
+      const pill = $('op-working-pill');
+      if (pill) {
+        pill.classList.add('hidden');
+        pill.classList.remove('flex');
+      }
+      if (workingTimerInterval) {
+        clearInterval(workingTimerInterval);
+        workingTimerInterval = null;
+      }
+    };
+
+    const runFullGeneration = async ({ topic, trilha, foco, sourceUrls, triggerBtn = null }) => {
       const st = $('ai-status');
       const btn = $('btn-run-ai');
+      const allTrendBtns = Array.from(document.querySelectorAll('[data-pick-trend]'));
+      allTrendBtns.forEach((b) => { b.disabled = true; });
+      if (triggerBtn) {
+        triggerBtn.textContent = '● Produzindo pauta...';
+      }
       btn.disabled = true;
       btn.textContent = '1/2 Pesquisando e escrevendo...';
       st.textContent = 'Passo 1/2: pesquisando fatos atualizados na web e montando a pauta completa (H1, H2, H3, TL;DR e FAQs)...';
       st.className = 'rounded-xl bg-black/[0.04] px-3.5 py-2.5 text-xs font-medium text-black/75';
+      showWorkingPill('Passo 1/2: pesquisando na web e escrevendo a pauta...');
 
       try {
         const res = await fetch('/api/admin/generate', {
@@ -1061,6 +1121,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
         if ($('ai-auto-cover').checked) {
           btn.textContent = '2/2 Gerando capa 16:9...';
           st.textContent = `Passo 2/2: texto pronto${searchLabel}! Gerando capa original 16:9 e salvando no Supabase Storage...`;
+          showWorkingPill('Passo 2/2: texto pronto! Gerando capa 16:9...');
           try {
             const imgRes = await fetch('/api/admin/generate-image', {
               method: 'POST',
@@ -1076,7 +1137,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
               $('f-imagem-url').value = imgData.url;
               $('f-imagem-credito').value = 'Ilustração Editorial OlhaPauta';
               updateQuality();
-              st.textContent = `Tudo pronto (${imgData.providerUsed}${searchLabel})! Confira o Semáforo Google à direita e clique em "Publicar agora".`;
+              st.textContent = `Tudo pronto (${imgData.providerUsed}${searchLabel})! Confira o Semáforo Google à direita e clique em "Publicar agora" ou "Agendar".`;
               st.className = 'rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800';
             } else {
               st.textContent = `Texto pronto${searchLabel}, mas a capa falhou (${imgData.error || 'erro'}). Você pode subir uma foto ou ajustar o provedor de imagem em Minha IA.`;
@@ -1087,15 +1148,20 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
             st.className = 'rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-900';
           }
         } else {
-          st.textContent = `Rascunho pronto${searchLabel}! Adicione a capa 16:9 e clique em "Publicar agora".`;
+          st.textContent = `Rascunho pronto${searchLabel}! Adicione a capa 16:9 e clique em "Publicar agora" ou "Agendar".`;
           st.className = 'rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800';
         }
       } catch (err) {
         st.textContent = err.message || 'Erro inesperado.';
         st.className = 'rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800';
       } finally {
+        hideWorkingPill();
         btn.disabled = false;
         btn.textContent = '⚡ Criar pauta completa (Texto + Capa)';
+        allTrendBtns.forEach((b) => {
+          b.disabled = false;
+          b.textContent = '⚡ Criar esta pauta (1 clique)';
+        });
       }
     };
 
@@ -1109,6 +1175,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
       btn.textContent = 'Pesquisando tendências de hoje...';
       st.textContent = 'Buscando o que está em alta hoje em IA, Tecnologia, Segurança e Negócios na linha editorial do OlhaPauta...';
       st.className = 'rounded-xl bg-black/[0.04] px-3.5 py-2.5 text-xs font-medium text-black/75';
+      showWorkingPill('Pesquisando o que está em alta hoje...');
 
       try {
         const res = await fetch('/api/admin/discover', {
@@ -1161,6 +1228,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
               trilha: chosen.trilha,
               foco: chosen.foco,
               sourceUrls: chosen.source_urls || [],
+              triggerBtn: pickBtn,
             });
           });
         });
@@ -1168,6 +1236,7 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
         st.textContent = err.message || 'Erro ao pesquisar tendências.';
         st.className = 'rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800';
       } finally {
+        hideWorkingPill();
         btn.disabled = false;
         btn.textContent = '✦ Buscar o que está em alta hoje';
       }
