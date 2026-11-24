@@ -194,17 +194,31 @@ if (client) {
           />
         </div>
 
-        <div class="border-t border-black/10 pt-4">
-          <label for="pexels_api_key" class="block text-xs font-semibold text-black/70">
-            Chave Pexels API (GRÁTIS — fotos reais nível revista em 16:9 HD · <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer" class="underline text-[#D92B2B]">pegar grátis em 30s ↗</a>)
-          </label>
-          <input
-            id="pexels_api_key"
-            name="pexels_api_key"
-            type="password"
-            placeholder={maskedProviderKeys.pexels ? `Salva: ${maskedProviderKeys.pexels} (deixe vazio para manter)` : 'Cole sua chave gratuita do Pexels para ativar fotos editoriais HD'}
-            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-          />
+        <div class="border-t border-black/10 pt-4 space-y-3">
+          <div>
+            <label for="pixabay_api_key" class="block text-xs font-semibold text-black/70">
+              Chave Pixabay API (GRÁTIS · emissão imediata · fotos HD 16:9 · <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer" class="underline text-[#D92B2B]">pegar grátis ↗</a>)
+            </label>
+            <input
+              id="pixabay_api_key"
+              name="pixabay_api_key"
+              type="password"
+              placeholder={maskedProviderKeys.pixabay ? `Salva: ${maskedProviderKeys.pixabay} (deixe vazio para manter)` : 'Cole sua chave gratuita do Pixabay (aparece direto na página de docs ao logar)'}
+              class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
+          <div>
+            <label for="pexels_api_key" class="block text-xs font-semibold text-black/70">
+              Chave Pexels API (opcional, se já tiver uma)
+            </label>
+            <input
+              id="pexels_api_key"
+              name="pexels_api_key"
+              type="password"
+              placeholder={maskedProviderKeys.pexels ? `Salva: ${maskedProviderKeys.pexels} (deixe vazio para manter)` : 'Opcional'}
+              class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
         </div>
       </section>
 
@@ -304,6 +318,7 @@ if (client) {
       image_model: imgModelEl.value,
       image_api_key: document.getElementById('image_api_key').value.trim(),
       pexels_api_key: document.getElementById('pexels_api_key').value.trim(),
+      pixabay_api_key: document.getElementById('pixabay_api_key').value.trim(),
     });
 
     const setEmptyModelSelect = (msg) => {
@@ -386,6 +401,7 @@ if (client) {
         document.getElementById('search_api_key').value = '';
         document.getElementById('image_api_key').value = '';
         document.getElementById('pexels_api_key').value = '';
+        document.getElementById('pixabay_api_key').value = '';
       } else {
         showMsg(false, data.error || 'Erro ao salvar.');
       }

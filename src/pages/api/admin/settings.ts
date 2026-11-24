@@ -108,6 +108,10 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     if (typedPexelsKey) {
       vault.pexels = typedPexelsKey;
     }
+    const typedPixabayKey = body.pixabay_api_key?.trim();
+    if (typedPixabayKey) {
+      vault.pixabay = typedPixabayKey;
+    }
 
     const activeApiKey = vault[provider] || (provider === 'opencode' ? 'public' : null);
     const searchApiKey = body.search_api_key?.trim() || existing?.search_api_key || null;

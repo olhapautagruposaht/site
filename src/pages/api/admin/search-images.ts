@@ -14,6 +14,8 @@ import {
 const FREE_LICENSES = ['cc0', 'public domain', 'cc by', 'cc-by', 'pd-'];
 const ALLOWED_IMAGE_HOSTS = [
   'images.pexels.com',
+  'pixabay.com',
+  'cdn.pixabay.com',
   'upload.wikimedia.org',
   'thumb.wikimedia.org',
   'commons.wikimedia.org',
@@ -149,6 +151,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     const { client } = getServiceSupabase(locals);
     let pexelsKey = '';
+    let pixabayKey = '';
     if (client) {
       const { data: cfg } = await client
         .from('admin_settings')
@@ -157,6 +160,50 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         .maybeSingle();
       const vault = (cfg?.provider_keys as Record<string, string> | null) || {};
       pexelsKey = vault.pexels?.trim() || '';
+      pixabayKey = vault.pixabay?.trim() || '';
+    }
+
+    if (pixabayKey) {
+      const q = queries[0];
+      const pbUrl = new URL('https://pixabay.com/api/');
+      pbUrl.searchParams.set('key', pixabayKey);
+      pbUrl.searchParams.set('q', q);
+      pbUrl.searchParams.set('image_type', 'photo');
+      pbUrl.searchParams.set('orientation', 'horizontal');
+      pbUrl.searchParams.set('min_width', '1280');
+      pbUrl.searchParams.set('safesearch', 'true');
+      pbUrl.searchParams.set('per_page', '9');
+
+      const pbRes = await fetch(pbUrl.toString(), { signal: AbortSignal.timeout(8000) });
+      if (pbRes.ok) {
+        const pbData = (await pbRes.json()) as {
+          hits?: {
+            largeImageURL?: string;
+            imageWidth?: number;
+            imageHeight?: number;
+            user?: string;
+            tags?: string;
+          }[];
+        };
+        const results = (pbData.hits || [])
+          .filter((h) => h.largeImageURL && (h.imageWidth || 0) > (h.imageHeight || 0))
+          .slice(0, 6)
+          .map((h) => ({
+            title: h.tags || titulo || q,
+            url: h.largeImageURL || '',
+            width: h.imageWidth || 1280,
+            height: h.imageHeight || 720,
+            license: 'Pixabay Free',
+            credit: `Foto: ${h.user || 'Pixabay'} / Pixabay`,
+            suggestedAlt: titulo ? `Imagem editorial da pauta: ${titulo}` : h.tags || q,
+          }));
+        if (results.length > 0) {
+          return new Response(JSON.stringify({ ok: true, query: q, source: 'pixabay', results }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
+          });
+        }
+      }
     }
 
     if (pexelsKey) {
