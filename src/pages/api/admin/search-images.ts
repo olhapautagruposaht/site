@@ -100,14 +100,30 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         allowHosts: ALLOWED_IMAGE_HOSTS,
       });
 
-      const imgRes = await fetch(safeUrl.toString(), {
-        redirect: 'error',
-        signal: AbortSignal.timeout(12000),
-        headers: { 'User-Agent': 'OlhaPautaCMS/1.0 (+https://olhapauta.com.br)' },
-      });
-      if (!imgRes.ok) {
+      // Follow at most 2 redirects, re-validating every hop against ALLOWED_IMAGE_HOSTS (SSRF-safe for Pixabay 302 -> cdn.pixabay.com)
+      let currentUrl = safeUrl.toString();
+      let imgRes: Response | null = null;
+      for (let hop = 0; hop < 3; hop++) {
+        imgRes = await fetch(currentUrl, {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(12000),
+          headers: { 'User-Agent': 'OlhaPautaCMS/1.0 (+https://olhapauta.com.br)' },
+        });
+        if (imgRes.status >= 300 && imgRes.status < 400) {
+          const loc = imgRes.headers.get('location');
+          if (!loc) break;
+          const nextSafe = assertSafeExternalUrl(new URL(loc, currentUrl).toString(), {
+            allowHosts: ALLOWED_IMAGE_HOSTS,
+          });
+          currentUrl = nextSafe.toString();
+          continue;
+        }
+        break;
+      }
+
+      if (!imgRes || !imgRes.ok) {
         return new Response(
-          JSON.stringify({ ok: false, error: `Não foi possível baixar a imagem (HTTP ${imgRes.status}).` }),
+          JSON.stringify({ ok: false, error: `Não foi possível baixar a imagem (HTTP ${imgRes?.status ?? 0}).` }),
           { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
         );
       }
