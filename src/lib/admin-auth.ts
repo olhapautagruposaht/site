@@ -65,9 +65,9 @@ export async function verifySessionToken(token: string | undefined, secret: stri
   return timingSafeEqual(sig, expected);
 }
 
-function isSameOriginRequest(request: Request): boolean {
+export function isSameOriginRequest(request: Request): boolean {
   const origin = request.headers.get('origin');
-  if (!origin) return true; // Same-origin navigations / non-browser clients without Origin
+  if (!origin) return false;
   try {
     const reqOrigin = new URL(request.url).origin;
     return origin === reqOrigin;

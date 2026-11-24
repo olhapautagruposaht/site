@@ -32,8 +32,9 @@ export function assertSafeExternalUrl(
   }
 
   const host = parsed.hostname.toLowerCase();
-  if (PRIVATE_HOST_PATTERNS.some((re) => re.test(host))) {
-    throw new Error('Destino de rede privada ou local não permitido.');
+  // Block raw IPv6 literals (including IPv4-mapped ::ffff:127.0.0.1) and private/local hosts
+  if (host.includes(':') || PRIVATE_HOST_PATTERNS.some((re) => re.test(host))) {
+    throw new Error('Destino de rede privada, IPv6 literal ou local não permitido.');
   }
 
   if (options?.allowHosts && options.allowHosts.length > 0) {

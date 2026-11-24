@@ -4,9 +4,17 @@ import {
   NOINDEX_HEADERS,
   createSessionToken,
   getAdminSecret,
+  isSameOriginRequest,
 } from '../../../lib/admin-auth';
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
+  if (!isSameOriginRequest(request)) {
+    return new Response(JSON.stringify({ ok: false, error: 'Origem inválida.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
+    });
+  }
+
   const secret = getAdminSecret(locals);
   if (!secret) {
     return new Response(
