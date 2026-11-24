@@ -1149,29 +1149,31 @@ if (client) {
       badge.className = `text-[10px] font-semibold ${okDiscover ? 'text-emerald-700' : 'text-amber-700'}`;
     });
 
-    if (initialPauta) {
-      hydrateForm(initialPauta);
-      hasUnsavedChanges = false;
-    } else {
-      let restored = false;
+    const tryRestoreLocalAutosave = () => {
       try {
         const rawLocal = localStorage.getItem(AUTOSAVE_KEY);
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          if (parsed?.data?.titulo || parsed?.data?.conteudo?.length) {
-            hydrateForm(parsed.data);
-            restored = true;
-            const fb = $('save-feedback');
-            fb.className = 'mt-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900';
-            fb.innerHTML = '<span>Rascunho local restaurado automaticamente! Você não perdeu nada.</span><button id="btn-discard-local" type="button" class="rounded-full border border-amber-400 px-3 py-1 text-[11px] font-semibold hover:bg-amber-100 cursor-pointer">Limpar e começar do zero</button>';
-            document.getElementById('btn-discard-local')?.addEventListener('click', () => {
-              clearLocalAutosave();
-              window.location.reload();
-            });
-          }
+        if (!rawLocal) return false;
+        const parsed = JSON.parse(rawLocal);
+        if (parsed?.data?.titulo || parsed?.data?.conteudo?.length) {
+          hydrateForm(parsed.data);
+          const fb = $('save-feedback');
+          fb.className = 'mt-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900';
+          fb.innerHTML = '<span>Rascunho local restaurado automaticamente! Você não perdeu nada.</span><button id="btn-discard-local" type="button" class="rounded-full border border-amber-400 px-3 py-1 text-[11px] font-semibold hover:bg-amber-100 cursor-pointer">Descartar rascunho local</button>';
+          document.getElementById('btn-discard-local')?.addEventListener('click', () => {
+            clearLocalAutosave();
+            window.location.reload();
+          });
+          return true;
         }
       } catch {}
-      if (!restored) {
+      return false;
+    };
+
+    if (!tryRestoreLocalAutosave()) {
+      if (initialPauta) {
+        hydrateForm(initialPauta);
+        clearLocalAutosave();
+      } else {
         renderSections();
         renderFaqs();
         updateQuality();

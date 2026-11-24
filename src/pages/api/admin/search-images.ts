@@ -186,7 +186,15 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
           }[];
         };
         const results = (pbData.hits || [])
-          .filter((h) => h.largeImageURL && (h.imageWidth || 0) > (h.imageHeight || 0))
+          .filter((h) => {
+            if (!h.largeImageURL || (h.imageWidth || 0) <= (h.imageHeight || 0)) return false;
+            try {
+              assertSafeExternalUrl(h.largeImageURL, { allowHosts: ALLOWED_IMAGE_HOSTS });
+              return true;
+            } catch {
+              return false;
+            }
+          })
           .slice(0, 6)
           .map((h) => ({
             title: h.tags || titulo || q,

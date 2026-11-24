@@ -28,16 +28,22 @@ const escapeHtmlText = (str: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-// XSS-safe rich paragraph renderer: escapes all HTML first, then converts only verified internal (/pauta/...) and HTTPS Markdown links
+// XSS-safe rich paragraph renderer: escapes all HTML first, then converts only strictly validated internal (/pauta/slug) and HTTPS Markdown links
+const INTERNAL_PATH_RE = /^\/pautas?\/[a-z0-9-]+$/;
 const renderRichText = (text: string) => {
   const escaped = escapeHtmlText(text);
-  return escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, rawHref: string) => {
-    const href = rawHref.trim();
-    if (href.startsWith('/pauta/') || href.startsWith('/pautas/')) {
-      return `<a href="${href}" data-astro-prefetch="viewport" class="font-medium underline decoration-[var(--color-accent)]/60 underline-offset-4 hover:decoration-[var(--color-accent)]">${label}</a>`;
+  return escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, rawHref: string) => {
+    const decoded = rawHref.replace(/&amp;/g, '&').trim();
+    if (INTERNAL_PATH_RE.test(decoded)) {
+      return `<a href="${escapeHtmlText(decoded)}" data-astro-prefetch="viewport" class="font-medium underline decoration-[var(--color-accent)]/60 underline-offset-4 hover:decoration-[var(--color-accent)]">${label}</a>`;
     }
-    if (href.startsWith('https://')) {
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4 hover:opacity-75">${label}</a>`;
+    try {
+      const parsed = new URL(decoded);
+      if (parsed.protocol === 'https:' && !parsed.username && !parsed.password) {
+        return `<a href="${escapeHtmlText(parsed.toString())}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4 hover:opacity-75">${label}</a>`;
+      }
+    } catch {
+      // Ignore invalid URLs
     }
     return label;
   });

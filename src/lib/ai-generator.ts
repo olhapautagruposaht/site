@@ -462,6 +462,20 @@ RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
   }
 
   const parsed = parseAiJson<{ suggestions?: TrendingSuggestion[] }>(raw);
+  const filterSafeUrls = (list: unknown[]): string[] =>
+    list
+      .filter((u): u is string => typeof u === 'string')
+      .map((u) => {
+        try {
+          const parsed = assertSafeExternalUrl(u);
+          if (parsed.username || parsed.password) return '';
+          return parsed.toString();
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean);
+
   const suggestions = (parsed.suggestions || []).slice(0, 5).map((s) => ({
     trilha: (['ia', 'tecnologia', 'seguranca', 'negocios', 'guias'].includes(s.trilha)
       ? s.trilha
@@ -472,8 +486,8 @@ RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
     motivo: (s.motivo || '').trim(),
     source_urls:
       Array.isArray(s.source_urls) && s.source_urls.length > 0
-        ? s.source_urls.filter((u) => typeof u === 'string' && u.startsWith('http'))
-        : groundingUrls.slice(0, 2),
+        ? filterSafeUrls(s.source_urls)
+        : filterSafeUrls(groundingUrls).slice(0, 2),
   }));
 
   return { suggestions, webSearchUsed };
@@ -552,7 +566,17 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
   }
 
   const parsed = parseAiJson<Partial<PautaPayload>>(raw);
-  const mergedSources = Array.from(new Set([...userSources, ...discoveredUrls])).slice(0, 6);
+  const mergedSources = Array.from(new Set([...userSources, ...discoveredUrls]))
+    .map((u) => {
+      try {
+        const safe = assertSafeExternalUrl(u);
+        return safe.username || safe.password ? '' : safe.toString();
+      } catch {
+        return '';
+      }
+    })
+    .filter(Boolean)
+    .slice(0, 6);
 
   return {
     draft: {
