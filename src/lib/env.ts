@@ -1,8 +1,15 @@
-export function getRuntimeEnv(locals: unknown, key: string): string | undefined {
-  const cfEnv = (locals as { runtime?: { env?: Record<string, string | undefined> } })?.runtime?.env;
-  if (cfEnv && typeof cfEnv[key] === 'string' && cfEnv[key]) {
-    return cfEnv[key];
+import { env as cfEnv } from 'cloudflare:workers';
+
+export function getRuntimeEnv(_locals: unknown, key: string): string | undefined {
+  try {
+    const val = (cfEnv as Record<string, unknown>)?.[key];
+    if (typeof val === 'string' && val) {
+      return val;
+    }
+  } catch {
+    // Fallback when running outside Cloudflare Workers runtime
   }
+
   const metaEnv = import.meta.env as Record<string, string | undefined>;
   if (typeof metaEnv[key] === 'string' && metaEnv[key]) {
     return metaEnv[key];
