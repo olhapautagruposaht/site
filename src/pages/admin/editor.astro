@@ -215,6 +215,13 @@ if (client) {
           <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">2. Capa 16:9 (Google Discover) & Vídeo</h2>
           <div class="flex flex-wrap items-center gap-2">
             <button
+              id="btn-search-photo"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1D1D1F] hover:bg-black/5 cursor-pointer"
+            >
+              🔍 Buscar foto livre (CC/DP)
+            </button>
+            <button
               id="btn-gen-cover"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-full bg-[#D92B2B] px-3.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
@@ -229,6 +236,26 @@ if (client) {
         </div>
 
         <p id="upload-status" class="hidden text-xs font-medium text-black/65"></p>
+
+        <!-- Free License Photo Picker (Wikimedia Commons CC0 / CC-BY) -->
+        <div id="photo-picker-wrap" class="hidden space-y-3 rounded-2xl border border-black/10 bg-[#F5F5F7]/70 p-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <input
+              id="photo-search-query"
+              type="text"
+              placeholder="Termo em inglês para refinar (opcional, ex: datacenter, smartphone, office)"
+              class="flex-1 min-w-[200px] rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs focus:border-black focus:outline-none"
+            />
+            <button
+              id="btn-search-photo-go"
+              type="button"
+              class="rounded-xl bg-[#1D1D1F] px-3.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
+            >
+              Pesquisar
+            </button>
+          </div>
+          <div id="photo-picker-grid" class="grid gap-3 sm:grid-cols-3"></div>
+        </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="sm:col-span-2">
@@ -744,6 +771,80 @@ if (client) {
         st.textContent = `Erro no upload: ${data.error || 'falha'}`;
       }
     });
+
+    // Free commercial-license photo search (Wikimedia Commons CC0 / CC-BY -> imports to Supabase Storage)
+    const runPhotoSearch = async (customQuery = '') => {
+      const wrap = $('photo-picker-wrap');
+      const grid = $('photo-picker-grid');
+      const st = $('upload-status');
+      wrap.classList.remove('hidden');
+      st.textContent = 'Buscando fotos reais livres de direitos autorais (CC0 / CC-BY, alta resolução)...';
+      st.classList.remove('hidden');
+      grid.innerHTML = '<p class="text-xs text-black/55 col-span-3">Pesquisando...</p>';
+
+      try {
+        const res = await fetch('/api/admin/search-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            titulo: $('f-titulo').value.trim(),
+            trilha: $('f-trilha').value,
+            query: customQuery,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Falha na busca.');
+        if (!data.results || data.results.length === 0) {
+          grid.innerHTML = '<p class="text-xs text-black/60 col-span-3">Nenhuma foto encontrada com esse termo. Tente outro termo em inglês acima.</p>';
+          st.textContent = `Busca "${data.query}" sem resultados. Tente refinar o termo.`;
+          return;
+        }
+        $('photo-search-query').value = data.query || '';
+        st.textContent = `${data.results.length} fotos livres encontradas ("${data.query}"). Clique em uma para salvar no seu Storage com Alt e Crédito automáticos:`;
+
+        grid.innerHTML = data.results
+          .map(
+            (img, idx) => `
+          <button
+            type="button"
+            data-pick-photo="${idx}"
+            class="group overflow-hidden rounded-xl border border-black/10 bg-white text-left hover:border-black transition-colors cursor-pointer"
+          >
+            <img src="${img.url}" alt="${img.title}" loading="lazy" class="aspect-[16/9] w-full object-cover group-hover:scale-[1.03] transition-transform" />
+            <div class="p-2">
+              <p class="truncate text-[10px] font-semibold text-[#1D1D1F]">${img.license} · ${img.width}×${img.height}</p>
+              <p class="truncate text-[10px] text-black/50">${img.credit}</p>
+            </div>
+          </button>
+        `
+          )
+          .join('');
+
+        grid.querySelectorAll('[data-pick-photo]').forEach((card) => {
+          card.addEventListener('click', async () => {
+            const chosen = data.results[Number(card.dataset.pickPhoto)];
+            st.textContent = 'Salvando foto selecionada no seu Supabase Storage...';
+            const impRes = await fetch('/api/admin/search-images', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ importUrl: chosen.url, titulo: $('f-titulo').value.trim() }),
+            });
+            const impData = await impRes.json();
+            $('f-imagem-url').value = impRes.ok && impData.ok ? impData.url : chosen.url;
+            if (!$('f-imagem-alt').value.trim()) $('f-imagem-alt').value = chosen.suggestedAlt;
+            $('f-imagem-credito').value = chosen.credit;
+            wrap.classList.add('hidden');
+            st.textContent = `Foto livre aplicada com Alt e Crédito (${chosen.license})!`;
+            updateQuality();
+          });
+        });
+      } catch (err) {
+        st.textContent = `Erro ao buscar fotos: ${err.message}`;
+      }
+    };
+
+    $('btn-search-photo').addEventListener('click', () => runPhotoSearch($('photo-search-query').value.trim()));
+    $('btn-search-photo-go').addEventListener('click', () => runPhotoSearch($('photo-search-query').value.trim()));
 
     // 1-Click AI 16:9 Cover Generator -> Supabase Storage
     $('btn-gen-cover').addEventListener('click', async () => {
