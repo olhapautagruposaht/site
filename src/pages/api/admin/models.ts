@@ -50,8 +50,13 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       models = (data.models || [])
         .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
         .map((m) => (m.name || '').replace(/^models\//, ''))
-        .filter((id) => id.includes('gemini'))
-        .reverse();
+        .filter(
+          (id) =>
+            id.includes('gemini') &&
+            !/gemini-(1\.|2\.0|2\.5)/i.test(id) &&
+            !/(embedding|image|tts|audio|robotics|computer-use|deep-research)/i.test(id)
+        )
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
     } else if (provider === 'anthropic') {
       const res = await fetch('https://api.anthropic.com/v1/models', {
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
