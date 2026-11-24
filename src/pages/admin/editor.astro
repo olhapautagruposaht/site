@@ -1,0 +1,822 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceSupabase, isAdminAuthenticated } from '../../lib/admin-auth';
+import { TRILHAS } from '../../data/pautas';
+
+const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
+if (!auth.ok) {
+  return Astro.redirect('/admin/login');
+}
+
+const editId = Astro.url.searchParams.get('id');
+const { client } = getServiceSupabase(Astro.locals);
+
+let initialPauta: Record<string, unknown> | null = null;
+let publishedLinks: { titulo: string; slug: string; trilha_label: string }[] = [];
+
+if (client) {
+  if (editId) {
+    const { data } = await client.from('pautas').select('*').eq('id', editId).maybeSingle();
+    if (data) initialPauta = data;
+  }
+  const { data: pub } = await client
+    .from('pautas')
+    .select('titulo, slug, trilha_label')
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
+    .limit(8);
+  if (pub) publishedLinks = pub;
+}
+---
+
+<AdminLayout title={editId ? 'Editar Pauta' : 'Nova Pauta'} activeNav="editor">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <a href="/admin" class="text-xs font-medium text-black/50 hover:text-black">← Voltar para pautas</a>
+      <h1 class="mt-1 text-2xl font-bold tracking-tight">
+        {editId ? 'Editar Pauta' : 'Nova Pauta'}<span class="text-[#D92B2B]">.</span>
+      </h1>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        id="toggle-ai-bar"
+        type="button"
+        class="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold text-[#1D1D1F] hover:bg-black/5 cursor-pointer"
+      >
+        ✦ Gerar com minha IA
+      </button>
+      <button
+        id="btn-save-draft"
+        type="button"
+        class="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold text-[#1D1D1F] hover:bg-black/5 cursor-pointer"
+      >
+        Salvar rascunho
+      </button>
+      <button
+        id="btn-publish"
+        type="button"
+        class="rounded-full bg-[#1D1D1F] px-5 py-2 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
+      >
+        Publicar agora
+      </button>
+    </div>
+  </div>
+
+  <!-- Collapsible 1-Click BYOK AI Generator -->
+  <section id="ai-bar" class="mt-5 hidden rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h2 class="text-sm font-bold">Gerar rascunho com a sua IA (BYOK)</h2>
+        <p class="text-xs text-black/55">
+          Usa a API cadastrada em <a href="/admin/configuracoes" class="underline">Minha IA (API)</a> já no padrão Discover / AIO / GEO e zero travessões.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-12">
+      <div class="sm:col-span-6">
+        <input
+          id="ai-topic"
+          type="text"
+          placeholder="Tema ou ângulo da pauta (ex: Como empresas brasileiras usam agentes de IA no WhatsApp)"
+          class="w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        />
+      </div>
+      <div class="sm:col-span-3">
+        <select
+          id="ai-foco"
+          class="w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        >
+          <option value="discover">Foco: Google Discover</option>
+          <option value="search">Foco: Guia Search / AIO / GEO</option>
+        </select>
+      </div>
+      <div class="sm:col-span-3">
+        <button
+          id="btn-run-ai"
+          type="button"
+          class="w-full rounded-xl bg-[#D92B2B] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+        >
+          Gerar rascunho
+        </button>
+      </div>
+      <div class="sm:col-span-12">
+        <input
+          id="ai-sources"
+          type="text"
+          placeholder="Links de referência opcionais (separados por vírgula)"
+          class="w-full rounded-xl border border-black/10 bg-[#F5F5F7] px-3.5 py-2 text-xs focus:border-black focus:bg-white focus:outline-none"
+        />
+      </div>
+    </div>
+    <p id="ai-status" class="mt-3 hidden text-xs font-medium"></p>
+  </section>
+
+  <!-- Global Save Feedback -->
+  <div id="save-feedback" class="mt-5 hidden rounded-2xl px-4 py-3 text-xs font-medium"></div>
+
+  <!-- 2-Column Structured Editor + Live Google Semaphore -->
+  <div class="mt-6 grid gap-6 lg:grid-cols-12 items-start">
+    <!-- Left Column: Structured Content -->
+    <div class="space-y-6 lg:col-span-8">
+      <!-- Basics -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">1. Identidade & SEO (H1 único)</h2>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Editoria</label>
+            <select id="f-trilha" class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3 py-2 text-sm">
+              {TRILHAS.map((t) => <option value={t.slug}>{t.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Status</label>
+            <select id="f-status" class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3 py-2 text-sm">
+              <option value="draft">Rascunho</option>
+              <option value="review">Revisão</option>
+              <option value="published">Publicada</option>
+              <option value="archived">Arquivada</option>
+            </select>
+          </div>
+          <div class="flex items-end pb-2">
+            <label class="inline-flex items-center gap-2 text-xs font-semibold text-black/75 cursor-pointer">
+              <input id="f-destaque" type="checkbox" class="h-4 w-4 rounded accent-[#D92B2B]" />
+              Destaque na capa
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-black/70">Título (H1 único · 50–85 chars)</label>
+          <input
+            id="f-titulo"
+            type="text"
+            placeholder="Título forte, humano e sem travessões"
+            class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-base font-semibold focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-black/70">Slug (URL em /pauta/...)</label>
+          <input
+            id="f-slug"
+            type="text"
+            placeholder="gerado-automaticamente-do-titulo"
+            class="mt-1 w-full rounded-xl border border-black/10 bg-[#F5F5F7] px-3.5 py-2 text-xs font-mono focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-black/70">Subtítulo / Meta Description (120–180 chars)</label>
+          <textarea
+            id="f-subtitulo"
+            rows="2"
+            placeholder="Linha fina explicando o impacto real da pauta"
+            class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-black/70">Resumo curto (Cards da Home e llms.txt)</label>
+          <textarea
+            id="f-resumo"
+            rows="2"
+            placeholder="1 a 2 frases objetivas"
+            class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+          ></textarea>
+        </div>
+      </section>
+
+      <!-- Media: 16:9 Image + Optional Video -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">2. Capa 16:9 (Google Discover) & Vídeo</h2>
+          <label class="inline-flex items-center gap-2 rounded-full bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 cursor-pointer">
+            <span>Subir foto 16:9</span>
+            <input id="f-upload" type="file" accept="image/webp,image/jpeg,image/png,image/avif" class="hidden" />
+          </label>
+        </div>
+
+        <p id="upload-status" class="hidden text-xs font-medium text-black/65"></p>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-black/70">URL da imagem de capa (16:9, mínimo 1200px)</label>
+            <input
+              id="f-imagem-url"
+              type="url"
+              placeholder="https://... (ou clique em Subir foto 16:9 acima)"
+              class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Texto Alt acessível (SEO de imagem)</label>
+            <input
+              id="f-imagem-alt"
+              type="text"
+              placeholder="Descrição clara da cena na imagem"
+              class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Crédito da imagem</label>
+            <input
+              id="f-imagem-credito"
+              type="text"
+              value="Editorial OlhaPauta"
+              class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-black/70">Vídeo opcional (URL do YouTube ou MP4 — gera VideoObject JSON-LD)</label>
+            <input
+              id="f-video-url"
+              type="url"
+              placeholder="https://www.youtube.com/watch?v=... (deixe vazio se for apenas foto)"
+              class="mt-1 w-full rounded-xl border border-black/10 bg-[#F5F5F7] px-3.5 py-2 text-sm focus:border-black focus:bg-white focus:outline-none"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- TL;DR (AIO / GEO) -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-3">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">3. O que você precisa saber (3 pontos · AIO / GEO)</h2>
+        <input id="f-tldr-0" type="text" placeholder="Ponto 1: tese principal em 1 frase direta" class="w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+        <input id="f-tldr-1" type="text" placeholder="Ponto 2: dado ou mudança prática" class="w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+        <input id="f-tldr-2" type="text" placeholder="Ponto 3: impacto para o leitor" class="w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+      </section>
+
+      <!-- Sections H2 / H3 -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">4. Corpo da Pauta (H2 + Subseções H3)</h2>
+          <button
+            id="btn-add-section"
+            type="button"
+            class="rounded-full bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-black/10 cursor-pointer"
+          >
+            + Nova seção H2
+          </button>
+        </div>
+        <div id="sections-container" class="space-y-4"></div>
+      </section>
+
+      <!-- FAQs -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">5. Perguntas Frequentes (FAQPage JSON-LD)</h2>
+          <button
+            id="btn-add-faq"
+            type="button"
+            class="rounded-full bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-black hover:bg-black/10 cursor-pointer"
+          >
+            + Nova pergunta
+          </button>
+        </div>
+        <div id="faqs-container" class="space-y-3"></div>
+      </section>
+
+      <!-- Sources, Tags, Author -->
+      <section class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">6. Fontes (E-E-A-T), Tags & Autor</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Tags (separadas por vírgula)</label>
+            <input id="f-tags" type="text" placeholder="IA, AGENTES, PRODUTIVIDADE, MCP" class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Fontes primárias (1 URL por linha)</label>
+            <textarea id="f-sources" rows="2" placeholder="https://..." class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-xs"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Autor</label>
+            <input id="f-autor-nome" type="text" value="Jonathas Costa" class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-black/70">Cargo</label>
+            <input id="f-autor-cargo" type="text" value="Fundador & Editor" class="mt-1 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2 text-sm" />
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Sticky Column: Live Google Semaphore + Discover Preview + Internal Links -->
+    <aside class="space-y-5 lg:col-span-4 lg:sticky lg:top-20">
+      <!-- Live Google Quality Gate -->
+      <div class="rounded-3xl border border-black/10 bg-white p-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">Semáforo Google</h2>
+          <span id="q-score" class="rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-bold">0%</span>
+        </div>
+        <p id="q-stats" class="mt-1 text-xs text-black/55">0 palavras · 2 MIN de leitura</p>
+        <ul id="q-checks" class="mt-4 space-y-2.5 text-xs"></ul>
+      </div>
+
+      <!-- Mobile Discover Card Preview -->
+      <div class="rounded-3xl border border-black/10 bg-white p-5">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">Prévia no Google Discover</h2>
+        <div class="mt-3 overflow-hidden rounded-2xl border border-black/10 bg-[#F5F5F7]">
+          <img
+            id="prev-img"
+            src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=1200&q=80"
+            alt="Prévia"
+            class="aspect-[16/9] w-full object-cover"
+          />
+          <div class="p-3.5">
+            <p class="text-[11px] font-semibold text-black/50">olhapauta.com.br</p>
+            <p id="prev-title" class="mt-1 text-sm font-bold leading-snug text-[#1D1D1F]">
+              Seu título de capa aparece aqui...
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suggested Internal Links -->
+      {publishedLinks.length > 0 && (
+        <div class="rounded-3xl border border-black/10 bg-white p-5">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">Links internos sugeridos</h2>
+          <p class="mt-1 text-[11px] text-black/55">Linke pautas relacionadas para subir páginas/sessão no AdSense.</p>
+          <ul class="mt-3 space-y-2">
+            {publishedLinks.map((item) => (
+              <li class="flex items-center justify-between gap-2 text-xs">
+                <span class="truncate text-black/75" title={item.titulo}>
+                  <strong class="text-[#D92B2B]">{item.trilha_label}:</strong> {item.titulo}
+                </span>
+                <button
+                  type="button"
+                  data-copy-url={`https://olhapauta.com.br/pauta/${item.slug}`}
+                  class="copy-link-btn shrink-0 rounded-full border border-black/15 px-2.5 py-0.5 text-[11px] font-semibold hover:bg-black/5 cursor-pointer"
+                >
+                  Copiar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </aside>
+  </div>
+
+  <script define:vars={{ initialPauta, editId }}>
+    const AI_CLICHES = [
+      'no cenário atual',
+      'é importante ressaltar',
+      'vale ressaltar',
+      'vale destacar',
+      'em suma',
+      'mergulhar fundo',
+      'revolucionário',
+      'divisor de águas',
+      'neste artigo vamos',
+    ];
+
+    const slugify = (text) =>
+      (text || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 96);
+
+    const $ = (id) => document.getElementById(id);
+
+    let sectionsState = [
+      { heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' },
+      { heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' },
+      { heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' },
+      { heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' },
+    ];
+    let faqsState = [
+      { pergunta: '', resposta: '' },
+      { pergunta: '', resposta: '' },
+      { pergunta: '', resposta: '' },
+    ];
+
+    let slugTouched = Boolean(editId);
+
+    const renderSections = () => {
+      const container = $('sections-container');
+      container.innerHTML = sectionsState
+        .map(
+          (sec, idx) => `
+        <div class="rounded-2xl border border-black/10 bg-[#F5F5F7]/70 p-4 space-y-3" data-sec="${idx}">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-black/45">Seção H2 #${idx + 1}</span>
+            <button type="button" data-remove-sec="${idx}" class="text-xs font-semibold text-red-600 hover:underline cursor-pointer">Remover</button>
+          </div>
+          <input type="text" data-sec-field="heading" data-idx="${idx}" value="${(sec.heading || '').replace(/"/g, '&quot;')}" placeholder="Título H2 desta seção" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm font-semibold" />
+          <textarea rows="4" data-sec-field="paragraphs" data-idx="${idx}" placeholder="Parágrafos da seção (separe parágrafos com uma linha em branco)" class="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm">${(sec.paragraphs || []).join('\n\n')}</textarea>
+
+          <div class="space-y-2 pl-3 border-l-2 border-black/10">
+            ${(sec.subsections || [])
+              .map(
+                (sub, sIdx) => `
+              <div class="rounded-xl bg-white p-3 space-y-2 border border-black/10">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold uppercase text-black/45">Subseção H3</span>
+                  <button type="button" data-remove-sub="${idx}:${sIdx}" class="text-[11px] text-red-600 cursor-pointer">Remover H3</button>
+                </div>
+                <input type="text" data-sub-field="heading" data-idx="${idx}" data-sidx="${sIdx}" value="${(sub.heading || '').replace(/"/g, '&quot;')}" placeholder="Subtítulo H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs font-semibold" />
+                <textarea rows="2" data-sub-field="paragraphs" data-idx="${idx}" data-sidx="${sIdx}" placeholder="Texto da subseção H3" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs">${(sub.paragraphs || []).join('\n\n')}</textarea>
+              </div>
+            `
+              )
+              .join('')}
+            <button type="button" data-add-sub="${idx}" class="text-xs font-semibold text-black/65 hover:text-black cursor-pointer">+ Adicionar subseção H3</button>
+          </div>
+
+          <details class="text-xs text-black/60">
+            <summary class="cursor-pointer font-semibold">Extras opcionais (citação, callout, lista)</summary>
+            <div class="mt-2 space-y-2">
+              <input type="text" data-sec-field="quote" data-idx="${idx}" value="${(sec.quote || '').replace(/"/g, '&quot;')}" placeholder="Citação editorial de destaque (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
+              <input type="text" data-sec-field="calloutText" data-idx="${idx}" value="${(sec.calloutText || '').replace(/"/g, '&quot;')}" placeholder="Box de contexto / callout (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
+              <textarea rows="2" data-sec-field="bullets" data-idx="${idx}" placeholder="Itens em lista (1 item por linha, opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs">${sec.bullets || ''}</textarea>
+            </div>
+          </details>
+        </div>
+      `
+        )
+        .join('');
+
+      container.querySelectorAll('[data-sec-field]').forEach((el) => {
+        el.addEventListener('input', () => {
+          const i = Number(el.dataset.idx);
+          const f = el.dataset.secField;
+          if (f === 'paragraphs') {
+            sectionsState[i].paragraphs = el.value.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+          } else {
+            sectionsState[i][f] = el.value;
+          }
+          updateQuality();
+        });
+      });
+
+      container.querySelectorAll('[data-sub-field]').forEach((el) => {
+        el.addEventListener('input', () => {
+          const i = Number(el.dataset.idx);
+          const si = Number(el.dataset.sidx);
+          const f = el.dataset.subField;
+          if (f === 'paragraphs') {
+            sectionsState[i].subsections[si].paragraphs = el.value.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+          } else {
+            sectionsState[i].subsections[si][f] = el.value;
+          }
+          updateQuality();
+        });
+      });
+
+      container.querySelectorAll('[data-remove-sec]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          sectionsState.splice(Number(btn.dataset.removeSec), 1);
+          renderSections();
+          updateQuality();
+        });
+      });
+
+      container.querySelectorAll('[data-add-sub]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const i = Number(btn.dataset.addSub);
+          sectionsState[i].subsections = sectionsState[i].subsections || [];
+          sectionsState[i].subsections.push({ heading: '', paragraphs: [''] });
+          renderSections();
+        });
+      });
+
+      container.querySelectorAll('[data-remove-sub]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const [i, si] = btn.dataset.removeSub.split(':').map(Number);
+          sectionsState[i].subsections.splice(si, 1);
+          renderSections();
+          updateQuality();
+        });
+      });
+    };
+
+    const renderFaqs = () => {
+      const container = $('faqs-container');
+      container.innerHTML = faqsState
+        .map(
+          (faq, idx) => `
+        <div class="rounded-2xl border border-black/10 bg-[#F5F5F7]/70 p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase text-black/45">FAQ #${idx + 1}</span>
+            <button type="button" data-remove-faq="${idx}" class="text-xs text-red-600 cursor-pointer">Remover</button>
+          </div>
+          <input type="text" data-faq-field="pergunta" data-idx="${idx}" value="${(faq.pergunta || '').replace(/"/g, '&quot;')}" placeholder="Pergunta real que o leitor busca no Google?" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs font-semibold" />
+          <textarea rows="2" data-faq-field="resposta" data-idx="${idx}" placeholder="Resposta objetiva em 2 a 3 frases" class="w-full rounded-xl border border-black/15 bg-white px-3 py-1.5 text-xs">${faq.resposta || ''}</textarea>
+        </div>
+      `
+        )
+        .join('');
+
+      container.querySelectorAll('[data-faq-field]').forEach((el) => {
+        el.addEventListener('input', () => {
+          faqsState[Number(el.dataset.idx)][el.dataset.faqField] = el.value;
+          updateQuality();
+        });
+      });
+
+      container.querySelectorAll('[data-remove-faq]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          faqsState.splice(Number(btn.dataset.removeFaq), 1);
+          renderFaqs();
+          updateQuality();
+        });
+      });
+    };
+
+    const collectPayload = (statusOverride) => {
+      const conteudo = sectionsState
+        .map((s) => {
+          const out = {
+            heading: (s.heading || '').trim() || undefined,
+            paragraphs: (s.paragraphs || []).filter((p) => p.trim()),
+          };
+          const subs = (s.subsections || [])
+            .map((sub) => ({
+              heading: (sub.heading || '').trim(),
+              paragraphs: (sub.paragraphs || []).filter((p) => p.trim()),
+            }))
+            .filter((sub) => sub.heading || sub.paragraphs.length > 0);
+          if (subs.length > 0) out.subsections = subs;
+          if (s.quote?.trim()) out.quote = s.quote.trim();
+          if (s.calloutText?.trim()) out.callout = { label: 'Contexto', text: s.calloutText.trim() };
+          const bullets = (s.bullets || '').split('\n').map((b) => b.trim()).filter(Boolean);
+          if (bullets.length > 0) out.bullets = bullets;
+          return out;
+        })
+        .filter((s) => s.heading || s.paragraphs.length > 0);
+
+      return {
+        id: editId || undefined,
+        trilha: $('f-trilha').value,
+        status: statusOverride || $('f-status').value,
+        destaque: $('f-destaque').checked,
+        titulo: $('f-titulo').value.trim(),
+        slug: $('f-slug').value.trim() || slugify($('f-titulo').value),
+        subtitulo: $('f-subtitulo').value.trim(),
+        resumo_curto: $('f-resumo').value.trim(),
+        imagem_url: $('f-imagem-url').value.trim(),
+        imagem_alt: $('f-imagem-alt').value.trim(),
+        imagem_credito: $('f-imagem-credito').value.trim() || 'Editorial OlhaPauta',
+        video_url: $('f-video-url').value.trim() || null,
+        tldr: [$('f-tldr-0').value.trim(), $('f-tldr-1').value.trim(), $('f-tldr-2').value.trim()].filter(Boolean),
+        conteudo,
+        faqs: faqsState.filter((f) => f.pergunta?.trim() && f.resposta?.trim()),
+        tags: $('f-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
+        source_urls: $('f-sources').value.split('\n').map((u) => u.trim()).filter(Boolean),
+        autor_nome: $('f-autor-nome').value.trim() || 'Jonathas Costa',
+        autor_cargo: $('f-autor-cargo').value.trim() || 'Fundador & Editor',
+      };
+    };
+
+    const updateQuality = () => {
+      const p = collectPayload();
+      const parts = [p.titulo, p.subtitulo, p.resumo_curto, ...p.tldr];
+      for (const s of p.conteudo) {
+        if (s.heading) parts.push(s.heading);
+        parts.push(...s.paragraphs);
+        if (s.quote) parts.push(s.quote);
+        if (s.callout?.text) parts.push(s.callout.text);
+        if (s.bullets) parts.push(...s.bullets);
+        for (const sub of s.subsections || []) {
+          parts.push(sub.heading, ...sub.paragraphs);
+        }
+      }
+      for (const f of p.faqs) parts.push(f.pergunta, f.resposta);
+
+      const fullText = parts.filter(Boolean).join(' ');
+      const words = fullText ? fullText.split(/\s+/).filter(Boolean).length : 0;
+      const readMin = Math.max(2, Math.ceil(words / 220));
+      const h2Count = p.conteudo.filter((s) => s.heading).length;
+      const hasDashes = /[—–]/.test(fullText);
+      const foundCliches = AI_CLICHES.filter((c) => fullText.toLowerCase().includes(c));
+
+      const checks = [
+        { ok: !hasDashes ? 'pass' : 'fail', label: 'Zero travessões (— / –)', detail: hasDashes ? 'Remova travessões!' : 'OK' },
+        { ok: foundCliches.length === 0 ? 'pass' : 'warn', label: 'Sem clichês de IA', detail: foundCliches.length ? foundCliches.join(', ') : 'OK' },
+        { ok: p.titulo.length >= 40 && p.titulo.length <= 105 ? 'pass' : p.titulo.length >= 15 ? 'warn' : 'fail', label: 'Título H1 (40–105 chars)', detail: `${p.titulo.length} chars` },
+        { ok: p.imagem_url && p.imagem_alt.length >= 15 ? 'pass' : p.imagem_url ? 'warn' : 'fail', label: 'Capa 16:9 + Alt', detail: p.imagem_url ? 'OK' : 'Faltando' },
+        { ok: words >= 750 && h2Count >= 4 ? 'pass' : words >= 400 ? 'warn' : 'fail', label: 'Profundidade (800+ pal. · 4+ H2)', detail: `${words} pal. · ${h2Count} H2` },
+        { ok: p.tldr.length >= 3 ? 'pass' : 'warn', label: 'O que você precisa saber (3)', detail: `${p.tldr.length}/3` },
+        { ok: p.faqs.length >= 3 ? 'pass' : 'warn', label: 'FAQs (FAQPage JSON-LD)', detail: `${p.faqs.length} FAQs` },
+      ];
+
+      const passed = checks.filter((c) => c.ok === 'pass').length;
+      const warned = checks.filter((c) => c.ok === 'warn').length;
+      const score = Math.round(((passed + warned * 0.5) / checks.length) * 100);
+
+      $('q-score').textContent = `${score}%`;
+      $('q-score').className = `rounded-full px-2.5 py-0.5 text-xs font-bold ${
+        score >= 85 ? 'bg-emerald-100 text-emerald-800' : score >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'
+      }`;
+      $('q-stats').textContent = `${words} palavras · ${readMin} MIN de leitura`;
+
+      $('q-checks').innerHTML = checks
+        .map((c) => {
+          const dot = c.ok === 'pass' ? 'bg-emerald-500' : c.ok === 'warn' ? 'bg-amber-400' : 'bg-red-500';
+          return `<li class="flex items-start gap-2">
+            <span class="mt-1 h-2 w-2 shrink-0 rounded-full ${dot}"></span>
+            <div class="min-w-0">
+              <p class="font-semibold text-[#1D1D1F]">${c.label}</p>
+              <p class="text-[11px] text-black/55">${c.detail}</p>
+            </div>
+          </li>`;
+        })
+        .join('');
+
+      $('prev-title').textContent = p.titulo || 'Seu título de capa aparece aqui...';
+      if (p.imagem_url) $('prev-img').src = p.imagem_url;
+    };
+
+    const hydrateForm = (data) => {
+      if (!data) return;
+      if (data.trilha) $('f-trilha').value = data.trilha;
+      if (data.status) $('f-status').value = data.status;
+      if (typeof data.destaque === 'boolean') $('f-destaque').checked = data.destaque;
+      if (data.titulo) $('f-titulo').value = data.titulo;
+      if (data.slug) $('f-slug').value = data.slug;
+      else if (data.titulo) $('f-slug').value = slugify(data.titulo);
+      if (data.subtitulo) $('f-subtitulo').value = data.subtitulo;
+      if (data.resumo_curto) $('f-resumo').value = data.resumo_curto;
+      if (data.imagem_url) $('f-imagem-url').value = data.imagem_url;
+      if (data.imagem_alt) $('f-imagem-alt').value = data.imagem_alt;
+      if (data.imagem_credito) $('f-imagem-credito').value = data.imagem_credito;
+      if (data.video_url) $('f-video-url').value = data.video_url;
+      if (Array.isArray(data.tldr)) {
+        $('f-tldr-0').value = data.tldr[0] || '';
+        $('f-tldr-1').value = data.tldr[1] || '';
+        $('f-tldr-2').value = data.tldr[2] || '';
+      }
+      if (Array.isArray(data.conteudo) && data.conteudo.length > 0) {
+        sectionsState = data.conteudo.map((s) => ({
+          heading: s.heading || '',
+          paragraphs: Array.isArray(s.paragraphs) ? s.paragraphs : [],
+          subsections: Array.isArray(s.subsections) ? s.subsections : [],
+          quote: s.quote || '',
+          calloutText: s.callout?.text || '',
+          bullets: Array.isArray(s.bullets) ? s.bullets.join('\n') : '',
+        }));
+      }
+      if (Array.isArray(data.faqs) && data.faqs.length > 0) {
+        faqsState = data.faqs;
+      }
+      if (Array.isArray(data.tags)) $('f-tags').value = data.tags.join(', ');
+      if (Array.isArray(data.source_urls)) $('f-sources').value = data.source_urls.join('\n');
+      if (data.autor_nome) $('f-autor-nome').value = data.autor_nome;
+      if (data.autor_cargo) $('f-autor-cargo').value = data.autor_cargo;
+      renderSections();
+      renderFaqs();
+      updateQuality();
+    };
+
+    $('f-titulo').addEventListener('input', () => {
+      if (!slugTouched) $('f-slug').value = slugify($('f-titulo').value);
+      updateQuality();
+    });
+    $('f-slug').addEventListener('input', () => { slugTouched = true; });
+    ['f-subtitulo', 'f-resumo', 'f-imagem-url', 'f-imagem-alt', 'f-tldr-0', 'f-tldr-1', 'f-tldr-2', 'f-tags'].forEach((id) => {
+      $(id).addEventListener('input', updateQuality);
+    });
+
+    $('btn-add-section').addEventListener('click', () => {
+      sectionsState.push({ heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' });
+      renderSections();
+      updateQuality();
+    });
+
+    $('btn-add-faq').addEventListener('click', () => {
+      faqsState.push({ pergunta: '', resposta: '' });
+      renderFaqs();
+      updateQuality();
+    });
+
+    $('toggle-ai-bar').addEventListener('click', () => {
+      $('ai-bar').classList.toggle('hidden');
+    });
+
+    // Direct 16:9 image upload to Supabase Storage
+    $('f-upload').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const st = $('upload-status');
+      st.textContent = 'Subindo imagem para o Supabase Storage...';
+      st.classList.remove('hidden');
+
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        $('f-imagem-url').value = data.url;
+        st.textContent = 'Imagem enviada com sucesso!';
+        updateQuality();
+      } else {
+        st.textContent = `Erro no upload: ${data.error || 'falha'}`;
+      }
+    });
+
+    // 1-Click BYOK AI generation
+    $('btn-run-ai').addEventListener('click', async () => {
+      const topic = $('ai-topic').value.trim();
+      const st = $('ai-status');
+      if (topic.length < 5) {
+        st.textContent = 'Digite um tema antes de gerar.';
+        st.className = 'mt-3 text-xs font-medium text-red-700';
+        return;
+      }
+      const btn = $('btn-run-ai');
+      btn.disabled = true;
+      btn.textContent = 'Gerando...';
+      st.textContent = 'Chamando sua IA configurada no padrão editorial do OlhaPauta...';
+      st.className = 'mt-3 text-xs font-medium text-black/65';
+
+      try {
+        const res = await fetch('/api/admin/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic,
+            trilha: $('f-trilha').value,
+            foco: $('ai-foco').value,
+            source_urls: $('ai-sources').value.split(',').map((u) => u.trim()).filter(Boolean),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Erro ao gerar.');
+        slugTouched = false;
+        hydrateForm(data.draft);
+        st.textContent = 'Rascunho gerado! Revise, adicione a capa 16:9 e clique em Publicar agora.';
+        st.className = 'mt-3 text-xs font-semibold text-emerald-700';
+      } catch (err) {
+        st.textContent = err.message || 'Erro inesperado.';
+        st.className = 'mt-3 text-xs font-semibold text-red-700';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gerar rascunho';
+      }
+    });
+
+    const savePauta = async (statusOverride, force = false) => {
+      const fb = $('save-feedback');
+      fb.className = 'mt-5 rounded-2xl bg-black/5 px-4 py-3 text-xs font-medium text-black/75';
+      fb.textContent = statusOverride === 'published' ? 'Publicando e notificando IndexNow...' : 'Salvando...';
+
+      const payload = { ...collectPayload(statusOverride), force };
+      const res = await fetch('/api/admin/pautas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.status === 422 && data.blockers) {
+        const msg = data.blockers.join(' | ');
+        if (confirm(`Quality Gate encontrou pendências:\n\n- ${data.blockers.join('\n- ')}\n\nDeseja publicar mesmo assim?`)) {
+          return savePauta(statusOverride, true);
+        }
+        fb.className = 'mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-800';
+        fb.textContent = `Bloqueado pelo Quality Gate: ${msg}`;
+        return;
+      }
+
+      if (!res.ok || !data.ok) {
+        fb.className = 'mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-800';
+        fb.textContent = data.error || 'Erro ao salvar pauta.';
+        return;
+      }
+
+      fb.className = 'mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800';
+      fb.innerHTML =
+        statusOverride === 'published'
+          ? `Pauta publicada! <a href="${data.url}" target="_blank" class="underline ml-1">Abrir no ar ↗</a> ${data.indexNowSent ? '· IndexNow enviado' : ''}`
+          : 'Rascunho salvo no Supabase!';
+
+      if (!editId && data.pauta?.id) {
+        window.history.replaceState({}, '', `/admin/editor?id=${data.pauta.id}`);
+      }
+    };
+
+    $('btn-save-draft').addEventListener('click', () => savePauta('draft'));
+    $('btn-publish').addEventListener('click', () => savePauta('published'));
+
+    document.querySelectorAll('.copy-link-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(btn.dataset.copyUrl);
+        btn.textContent = 'Copiado!';
+        setTimeout(() => (btn.textContent = 'Copiar'), 1500);
+      });
+    });
+
+    if (initialPauta) hydrateForm(initialPauta);
+    else {
+      renderSections();
+      renderFaqs();
+      updateQuality();
+    }
+  </script>
+</AdminLayout>

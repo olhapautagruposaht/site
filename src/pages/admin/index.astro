@@ -1,0 +1,169 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceSupabase, isAdminAuthenticated } from '../../lib/admin-auth';
+
+const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
+if (!auth.ok) {
+  return Astro.redirect('/admin/login');
+}
+
+const { client, error: supaError } = getServiceSupabase(Astro.locals);
+let pautas: any[] = [];
+let dbError = supaError || '';
+
+if (client) {
+  const { data, error } = await client
+    .from('pautas')
+    .select('id, numero, slug, trilha, trilha_label, status, titulo, tempo_leitura, published_at, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) {
+    dbError = error.message;
+  } else {
+    pautas = data || [];
+  }
+}
+
+const statusLabels: Record<string, { label: string; cls: string }> = {
+  published: { label: 'Publicada', cls: 'bg-emerald-100 text-emerald-800' },
+  review: { label: 'Revisão', cls: 'bg-amber-100 text-amber-800' },
+  draft: { label: 'Rascunho', cls: 'bg-black/10 text-black/70' },
+  archived: { label: 'Arquivada', cls: 'bg-red-100 text-red-700' },
+};
+---
+
+<AdminLayout title="Pautas" activeNav="pautas">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">
+        Pautas<span class="text-[#D92B2B]">.</span>
+      </h1>
+      <p class="mt-1 text-sm text-black/60">
+        Gerencie pautas manuais, geradas pela sua IA ou enviadas por Hermes Agent / n8n.
+      </p>
+    </div>
+
+    <a
+      href="/admin/editor"
+      class="inline-flex items-center justify-center rounded-full bg-[#1D1D1F] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+    >
+      + Nova Pauta
+    </a>
+  </div>
+
+  {dbError && (
+    <div class="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <p class="font-semibold">Atenção na conexão com o Supabase:</p>
+      <p class="mt-1 text-xs">{dbError}</p>
+    </div>
+  )}
+
+  <div class="mt-6 flex flex-wrap gap-2" id="status-filters">
+    {(['all', 'published', 'review', 'draft', 'archived'] as const).map((st) => (
+      <button
+        type="button"
+        data-status={st}
+        class={`status-pill rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+          st === 'all' ? 'bg-[#1D1D1F] text-white' : 'bg-white text-black/70 border border-black/10 hover:bg-black/5'
+        }`}
+      >
+        {st === 'all' ? 'Todas' : statusLabels[st].label}
+      </button>
+    ))}
+  </div>
+
+  <div class="mt-5 overflow-hidden rounded-3xl border border-black/10 bg-white">
+    {pautas.length === 0 ? (
+      <div class="p-12 text-center">
+        <p class="text-base font-semibold text-[#1D1D1F]">Nenhuma pauta cadastrada no Supabase ainda.</p>
+        <p class="mt-1.5 text-sm text-black/60">
+          Clique em <strong>+ Nova Pauta</strong> para criar manualmente ou gerar com a sua IA em 1 clique.
+        </p>
+        <a
+          href="/admin/editor"
+          class="mt-5 inline-flex rounded-full bg-[#1D1D1F] px-5 py-2.5 text-xs font-semibold text-white"
+        >
+          Criar primeira pauta
+        </a>
+      </div>
+    ) : (
+      <div class="divide-y divide-black/10" id="pautas-list">
+        {pautas.map((p) => {
+          const st = statusLabels[p.status] || statusLabels.draft;
+          return (
+            <div
+              data-row-status={p.status}
+              class="pauta-item flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between hover:bg-black/[0.015] transition-colors"
+            >
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                  <span class={`rounded-full px-2.5 py-0.5 font-semibold ${st.cls}`}>{st.label}</span>
+                  <span class="font-semibold uppercase tracking-wider text-[#D92B2B]">{p.trilha_label}</span>
+                  <span class="text-black/45">· {p.tempo_leitura}</span>
+                </div>
+                <h2 class="mt-1.5 truncate text-base font-bold text-[#1D1D1F]">{p.titulo}</h2>
+                <p class="mt-0.5 truncate text-xs text-black/50">/pauta/{p.slug}</p>
+              </div>
+
+              <div class="flex shrink-0 items-center gap-2 text-xs font-semibold">
+                {p.status === 'published' && (
+                  <a
+                    href={`/pauta/${p.slug}`}
+                    target="_blank"
+                    class="rounded-full border border-black/15 px-3 py-1.5 text-black/75 hover:bg-black/5"
+                  >
+                    Ver ↗
+                  </a>
+                )}
+                <a
+                  href={`/admin/editor?id=${p.id}`}
+                  class="rounded-full bg-[#1D1D1F] px-3.5 py-1.5 text-white hover:opacity-90"
+                >
+                  Editar
+                </a>
+                <button
+                  type="button"
+                  data-delete-id={p.id}
+                  class="delete-btn rounded-full border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50 cursor-pointer"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  <script is:inline>
+    const pills = document.querySelectorAll('.status-pill');
+    const rows = document.querySelectorAll('.pauta-item');
+
+    pills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        const st = pill.dataset.status;
+        pills.forEach((b) => {
+          b.classList.remove('bg-[#1D1D1F]', 'text-white');
+          b.classList.add('bg-white', 'text-black/70', 'border', 'border-black/10');
+        });
+        pill.classList.add('bg-[#1D1D1F]', 'text-white');
+        pill.classList.remove('bg-white', 'text-black/70', 'border', 'border-black/10');
+
+        rows.forEach((row) => {
+          row.style.display = st === 'all' || row.dataset.rowStatus === st ? '' : 'none';
+        });
+      });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Excluir esta pauta permanentemente?')) return;
+        const id = btn.dataset.deleteId;
+        const res = await fetch(`/api/admin/pautas?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (res.ok) window.location.reload();
+        else alert('Erro ao excluir pauta.');
+      });
+    });
+  </script>
+</AdminLayout>

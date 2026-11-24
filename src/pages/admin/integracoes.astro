@@ -1,0 +1,96 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { isAdminAuthenticated } from '../../lib/admin-auth';
+
+const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
+if (!auth.ok) {
+  return Astro.redirect('/admin/login');
+}
+
+const sampleJson = JSON.stringify(
+  {
+    trilha: 'ia',
+    status: 'review',
+    titulo: 'Título da pauta otimizado para Discover sem travessões',
+    subtitulo: 'Linha fina clara com 120 a 170 caracteres explicando o impacto prático.',
+    resumo_curto: 'Resumo objetivo de 1 a 2 frases para os cards da capa.',
+    imagem_url: 'https://travyowpjigplzflvtxb.supabase.co/storage/v1/object/public/pautas-images/exemplo.webp',
+    imagem_alt: 'Descrição acessível e precisa da imagem 16:9',
+    video_url: '',
+    tldr: [
+      'Ponto objetivo 1 para AIO e Google Discover.',
+      'Ponto objetivo 2 com dado ou impacto concreto.',
+      'Ponto objetivo 3 com aplicação prática.',
+    ],
+    conteudo: [
+      {
+        heading: 'Seção H2 principal',
+        paragraphs: ['Primeiro parágrafo direto e humano.', 'Segundo parágrafo com contexto prático.'],
+        subsections: [
+          {
+            heading: 'Subtítulo H3 opcional',
+            paragraphs: ['Detalhamento escaneável dentro da seção H2.'],
+          },
+        ],
+      },
+    ],
+    faqs: [
+      { pergunta: 'Pergunta real que o leitor busca no Google?', resposta: 'Resposta direta em 2 a 3 frases.' },
+    ],
+    source_urls: ['https://fonte-primaria-oficial.com/artigo'],
+    tags: ['IA', 'AGENTES', 'PRODUTIVIDADE'],
+  },
+  null,
+  2
+);
+---
+
+<AdminLayout title="Integrações API" activeNav="integracoes">
+  <div class="max-w-3xl space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">
+        Integrações (Hermes Agent, n8n, Cockpit)<span class="text-[#D92B2B]">.</span>
+      </h1>
+      <p class="mt-1.5 text-sm text-black/60">
+        Qualquer automação externa pode enviar pautas ou subir imagens usando o mesmo Quality Gate do painel.
+      </p>
+    </div>
+
+    <div class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+      <h2 class="text-base font-bold">1. Autenticação (Header)</h2>
+      <p class="text-sm text-black/65">
+        Configure a variável secreta <code>ADMIN_API_KEY</code> no Worker da Cloudflare e envie em todas as requisições:
+      </p>
+      <pre class="overflow-x-auto rounded-2xl bg-[#1D1D1F] p-4 text-xs text-white/90"><code>Authorization: Bearer SUA_ADMIN_API_KEY
+Content-Type: application/json</code></pre>
+    </div>
+
+    <div class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-base font-bold">2. Criar ou publicar pauta</h2>
+        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+          POST /api/admin/pautas
+        </span>
+      </div>
+      <p class="text-sm text-black/65">
+        Use <code>"status": "review"</code> para cair na sua caixa de revisão do <code>/admin</code>, ou <code>"status": "published"</code> para ir ao ar na hora (com validação automática + disparo do IndexNow).
+      </p>
+      <pre class="overflow-x-auto rounded-2xl bg-[#1D1D1F] p-4 text-xs text-white/90"><code>{sampleJson}</code></pre>
+    </div>
+
+    <div class="rounded-3xl border border-black/10 bg-white p-6 space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-base font-bold">3. Upload de capa 16:9</h2>
+        <span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+          POST /api/admin/upload
+        </span>
+      </div>
+      <p class="text-sm text-black/65">
+        Envie <code>multipart/form-data</code> com o campo <code>file</code> (WebP, JPG, PNG ou AVIF até 10 MB). Retorna a URL pública pronta para usar em <code>imagem_url</code>.
+      </p>
+      <pre class="overflow-x-auto rounded-2xl bg-[#1D1D1F] p-4 text-xs text-white/90"><code>curl -X POST https://olhapauta.com.br/api/admin/upload \
+  -H "Authorization: Bearer SUA_ADMIN_API_KEY" \
+  -F "file=@capa-16x9.webp"</code></pre>
+    </div>
+  </div>
+</AdminLayout>

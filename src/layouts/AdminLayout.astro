@@ -1,0 +1,112 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  activeNav?: 'pautas' | 'editor' | 'configuracoes' | 'integracoes';
+  hideNav?: boolean;
+}
+
+const { title, activeNav = 'pautas', hideNav = false } = Astro.props;
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} · Admin OlhaPauta</title>
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] antialiased">
+    {!hideNav && (
+      <header class="sticky top-0 z-40 border-b border-black/10 bg-white/85 backdrop-blur-xl">
+        <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+          <div class="flex items-center gap-6">
+            <a href="/admin" class="flex items-center gap-2 text-sm font-bold tracking-tight">
+              <img src="/images/logo-olhapauta.webp" alt="OlhaPauta" class="h-[18px] w-auto" />
+              <span class="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-semibold text-black/60">
+                CMS
+              </span>
+            </a>
+
+            <nav class="hidden md:flex items-center gap-1 text-[13px] font-medium">
+              <a
+                href="/admin"
+                class={`rounded-full px-3 py-1.5 transition-colors ${
+                  activeNav === 'pautas' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
+                }`}
+              >
+                Pautas
+              </a>
+              <a
+                href="/admin/editor"
+                class={`rounded-full px-3 py-1.5 transition-colors ${
+                  activeNav === 'editor' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
+                }`}
+              >
+                + Nova Pauta
+              </a>
+              <a
+                href="/admin/configuracoes"
+                class={`rounded-full px-3 py-1.5 transition-colors ${
+                  activeNav === 'configuracoes' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
+                }`}
+              >
+                Minha IA (API)
+              </a>
+              <a
+                href="/admin/integracoes"
+                class={`rounded-full px-3 py-1.5 transition-colors ${
+                  activeNav === 'integracoes' ? 'bg-black text-white' : 'text-black/65 hover:text-black hover:bg-black/5'
+                }`}
+              >
+                Integrações (n8n / Hermes)
+              </a>
+            </nav>
+          </div>
+
+          <div class="flex items-center gap-3 text-[13px]">
+            <a
+              href="/"
+              target="_blank"
+              class="rounded-full px-3 py-1.5 font-medium text-black/60 hover:text-black hover:bg-black/5 transition-colors"
+            >
+              Ver site ↗
+            </a>
+            <button
+              id="admin-logout-btn"
+              type="button"
+              class="rounded-full border border-black/15 px-3 py-1.5 font-medium text-black/75 hover:bg-black/5 transition-colors cursor-pointer"
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+    )}
+
+    <main class="mx-auto max-w-6xl px-5 py-8">
+      <slot />
+    </main>
+
+    {!hideNav && (
+      <script is:inline>
+        document.getElementById('admin-logout-btn')?.addEventListener('click', async () => {
+          await fetch('/api/admin/login', { method: 'DELETE' });
+          window.location.href = '/admin/login';
+        });
+      </script>
+    )}
+  </body>
+</html>

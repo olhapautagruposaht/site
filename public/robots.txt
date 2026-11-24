@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
 # AI Search & GEO Crawlers (allowed for citation & visibility)
 User-agent: OAI-SearchBot

@@ -1,0 +1,88 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { isAdminAuthenticated } from '../../lib/admin-auth';
+
+const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
+if (auth.ok) {
+  return Astro.redirect('/admin');
+}
+---
+
+<AdminLayout title="Entrar" hideNav={true}>
+  <div class="flex min-h-[75vh] items-center justify-center">
+    <div class="w-full max-w-sm rounded-3xl border border-black/10 bg-white p-8 shadow-sm">
+      <div class="flex items-center justify-between">
+        <img src="/images/logo-olhapauta.webp" alt="OlhaPauta" class="h-5 w-auto" />
+        <span class="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-semibold text-black/60">
+          Admin CMS
+        </span>
+      </div>
+
+      <h1 class="mt-6 text-2xl font-bold tracking-tight text-[#1D1D1F]">
+        Acesso editorial<span class="text-[#D92B2B]">.</span>
+      </h1>
+      <p class="mt-1.5 text-sm text-black/60">
+        Digite sua senha de administrador para gerenciar pautas, IA e integrações.
+      </p>
+
+      <form id="login-form" class="mt-6 space-y-4">
+        <div>
+          <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
+            Senha
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autofocus
+            placeholder="••••••••••••"
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-3 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+
+        <p id="login-error" class="hidden rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700"></p>
+
+        <button
+          id="login-submit"
+          type="submit"
+          class="w-full rounded-full bg-[#1D1D1F] px-5 py-3 text-sm font-semibold text-white hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Entrar no painel
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script is:inline>
+    const form = document.getElementById('login-form');
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-submit');
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+
+      try {
+        const password = document.getElementById('password').value;
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Falha ao entrar.');
+        }
+        window.location.href = '/admin';
+      } catch (err) {
+        errEl.textContent = err.message || 'Erro inesperado.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Entrar no painel';
+      }
+    });
+  </script>
+</AdminLayout>

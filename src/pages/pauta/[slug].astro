@@ -117,6 +117,25 @@ if (pauta.faqs && pauta.faqs.length > 0) {
   });
 }
 
+if (pauta.videoUrl) {
+  graph.push({
+    '@type': 'VideoObject',
+    name: pauta.titulo,
+    description: pauta.subtitulo,
+    thumbnailUrl: [pauta.imagem.url],
+    uploadDate: pauta.dataISO,
+    contentUrl: pauta.videoUrl,
+    embedUrl: pauta.videoUrl,
+  });
+}
+
+const getYoutubeId = (url?: string) => {
+  if (!url) return null;
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+};
+const youtubeId = getYoutubeId(pauta.videoUrl);
+
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': graph,
@@ -353,10 +372,41 @@ const jsonLd = {
 
       <!-- Body Copy -->
       <div id="article-body" class="editorial-prose mt-10 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+        {pauta.videoUrl && (
+          <div class="mb-10 overflow-hidden rounded-2xl bg-black aspect-video">
+            {youtubeId ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
+                title={pauta.titulo}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                class="h-full w-full border-0"
+              />
+            ) : (
+              <video
+                src={pauta.videoUrl}
+                poster={pauta.imagem.url}
+                controls
+                playsinline
+                preload="metadata"
+                class="h-full w-full object-cover"
+              />
+            )}
+          </div>
+        )}
+
         {pauta.conteudo.map((section, idx) => (
           <section id={section.heading ? `secao-${idx + 1}` : undefined} class="scroll-mt-24">
             {section.heading && <h2>{section.heading}</h2>}
             {section.paragraphs.map((p) => <p>{p}</p>)}
+
+            {section.subsections && section.subsections.map((sub) => (
+              <div class="mt-6">
+                {sub.heading && <h3>{sub.heading}</h3>}
+                {sub.paragraphs.map((sp) => <p>{sp}</p>)}
+              </div>
+            ))}
 
             {section.quote && <blockquote>{section.quote}</blockquote>}
 
@@ -410,6 +460,32 @@ const jsonLd = {
               </details>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Primary Sources (E-E-A-T & GEO) */}
+      {pauta.sourceUrls && pauta.sourceUrls.length > 0 && (
+        <section
+          aria-label="Fontes e referências"
+          class="mt-10 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-7"
+        >
+          <h2 class="text-sm font-semibold uppercase tracking-[0.06em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+            Fontes e referências
+          </h2>
+          <ul class="mt-3 space-y-1.5 text-sm text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+            {pauta.sourceUrls.map((srcUrl) => (
+              <li class="truncate">
+                <a
+                  href={srcUrl}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  class="underline underline-offset-4 hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)]"
+                >
+                  {srcUrl}
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

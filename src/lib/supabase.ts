@@ -24,6 +24,8 @@ interface PautaRow {
   imagem_url: string;
   imagem_alt: string;
   imagem_credito: string;
+  video_url?: string | null;
+  source_urls?: string[];
   tags: string[];
   destaque: boolean;
   conteudo: Pauta['conteudo'];
@@ -62,6 +64,8 @@ function mapRowToPauta(row: PautaRow): Pauta {
       alt: row.imagem_alt,
       credito: row.imagem_credito,
     },
+    videoUrl: row.video_url || undefined,
+    sourceUrls: Array.isArray(row.source_urls) ? row.source_urls : undefined,
     tags: Array.isArray(row.tags) ? row.tags : [],
     destaque: row.destaque,
     conteudo: Array.isArray(row.conteudo) ? row.conteudo : [],

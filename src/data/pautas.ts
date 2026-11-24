@@ -1,8 +1,14 @@
 export type TrilhaSlug = 'ia' | 'tecnologia' | 'seguranca' | 'negocios' | 'guias';
 
+export interface PautaSubsection {
+  heading: string;
+  paragraphs: string[];
+}
+
 export interface PautaSection {
   heading?: string;
   paragraphs: string[];
+  subsections?: PautaSubsection[];
   quote?: string;
   callout?: {
     label: string;
@@ -37,6 +43,8 @@ export interface Pauta {
     alt: string;
     credito: string;
   };
+  videoUrl?: string;
+  sourceUrls?: string[];
   tags: string[];
   destaque?: boolean;
   conteudo: PautaSection[];

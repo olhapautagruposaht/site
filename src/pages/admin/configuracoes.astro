@@ -1,0 +1,194 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceSupabase, isAdminAuthenticated } from '../../lib/admin-auth';
+
+const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
+if (!auth.ok) {
+  return Astro.redirect('/admin/login');
+}
+
+const { client } = getServiceSupabase(Astro.locals);
+let current = {
+  ai_provider: 'openai',
+  ai_model: 'gpt-4o-mini',
+  ai_base_url: '',
+  has_api_key: false,
+  masked_api_key: '',
+};
+
+if (client) {
+  const { data } = await client.from('admin_settings').select('*').eq('id', 'default').maybeSingle();
+  if (data) {
+    const k = data.ai_api_key || '';
+    current = {
+      ai_provider: data.ai_provider || 'openai',
+      ai_model: data.ai_model || 'gpt-4o-mini',
+      ai_base_url: data.ai_base_url || '',
+      has_api_key: Boolean(k),
+      masked_api_key: k ? (k.length > 10 ? `${k.slice(0, 6)}••••••${k.slice(-4)}` : '••••••••') : '',
+    };
+  }
+}
+---
+
+<AdminLayout title="Minha IA (BYOK)" activeNav="configuracoes">
+  <div class="max-w-2xl">
+    <h1 class="text-2xl font-bold tracking-tight">
+      Minha IA (API Própria)<span class="text-[#D92B2B]">.</span>
+    </h1>
+    <p class="mt-1.5 text-sm text-black/60">
+      Conecte sua própria chave de API (OpenAI, Gemini, Claude, Grok, OpenRouter ou endpoint compatível) para gerar rascunhos dentro do editor com 1 clique.
+    </p>
+
+    <form id="ai-settings-form" class="mt-6 space-y-5 rounded-3xl border border-black/10 bg-white p-7">
+      <div>
+        <label for="ai_provider" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
+          Provedor de IA
+        </label>
+        <select
+          id="ai_provider"
+          name="ai_provider"
+          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        >
+          <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-4o / GPT-4.1)</option>
+          <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (Gemini 2.5 Pro / Flash)</option>
+          <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet / Opus)</option>
+          <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 3)</option>
+          <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Qualquer modelo)</option>
+          <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="ai_model" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
+          Modelo
+        </label>
+        <input
+          id="ai_model"
+          name="ai_model"
+          type="text"
+          value={current.ai_model}
+          placeholder="ex: gpt-4o, gemini-2.5-pro, claude-sonnet-4-20250514, grok-3"
+          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        />
+      </div>
+
+      <div id="custom-url-wrap" class={current.ai_provider === 'custom' ? '' : 'hidden'}>
+        <label for="ai_base_url" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
+          Base URL (OpenAI-compatible)
+        </label>
+        <input
+          id="ai_base_url"
+          name="ai_base_url"
+          type="url"
+          value={current.ai_base_url}
+          placeholder="https://seu-servidor.com/v1"
+          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label for="ai_api_key" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
+          Chave de API (API Key)
+        </label>
+        <input
+          id="ai_api_key"
+          name="ai_api_key"
+          type="password"
+          placeholder={current.has_api_key ? `Salva: ${current.masked_api_key} (deixe vazio para manter)` : 'Cole sua chave sk-... / AIza...'}
+          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+        />
+        <p class="mt-1.5 text-xs text-black/50">
+          Guardada na tabela privada <code>admin_settings</code> (RLS bloqueado para leitura pública).
+        </p>
+      </div>
+
+      <div id="settings-feedback" class="hidden rounded-xl px-4 py-3 text-xs font-medium"></div>
+
+      <div class="flex flex-wrap items-center gap-3 pt-2">
+        <button
+          id="save-settings-btn"
+          type="submit"
+          class="rounded-full bg-[#1D1D1F] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+        >
+          Salvar configurações
+        </button>
+        <button
+          id="test-ai-btn"
+          type="button"
+          class="rounded-full border border-black/15 px-5 py-2.5 text-sm font-semibold text-black/80 hover:bg-black/5 cursor-pointer"
+        >
+          Testar conexão
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script is:inline>
+    const providerEl = document.getElementById('ai_provider');
+    const modelEl = document.getElementById('ai_model');
+    const baseUrlWrap = document.getElementById('custom-url-wrap');
+    const fb = document.getElementById('settings-feedback');
+
+    const defaultModels = {
+      openai: 'gpt-4o',
+      gemini: 'gemini-2.5-flash',
+      anthropic: 'claude-sonnet-4-20250514',
+      grok: 'grok-3',
+      openrouter: 'openai/gpt-4o-mini',
+      custom: 'gpt-4o-mini',
+    };
+
+    providerEl?.addEventListener('change', () => {
+      const p = providerEl.value;
+      baseUrlWrap.classList.toggle('hidden', p !== 'custom');
+      if (defaultModels[p]) modelEl.value = defaultModels[p];
+    });
+
+    const showMsg = (ok, text) => {
+      fb.textContent = text;
+      fb.className = `rounded-xl px-4 py-3 text-xs font-medium ${
+        ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+      }`;
+    };
+
+    const getBody = () => ({
+      ai_provider: providerEl.value,
+      ai_model: modelEl.value.trim(),
+      ai_base_url: document.getElementById('ai_base_url').value.trim(),
+      ai_api_key: document.getElementById('ai_api_key').value.trim(),
+    });
+
+    document.getElementById('ai-settings-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showMsg(true, 'Salvando...');
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getBody()),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showMsg(true, 'Configurações salvas! Você já pode gerar pautas com 1 clique no Editor.');
+        document.getElementById('ai_api_key').value = '';
+      } else {
+        showMsg(false, data.error || 'Erro ao salvar.');
+      }
+    });
+
+    document.getElementById('test-ai-btn')?.addEventListener('click', async () => {
+      showMsg(true, 'Testando conexão com a API...');
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getBody()),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showMsg(true, `Conexão OK! Resposta: ${data.reply || 'ok'}`);
+      } else {
+        showMsg(false, `Falha no teste: ${data.error || 'Verifique a chave e o modelo.'}`);
+      }
+    });
+  </script>
+</AdminLayout>
