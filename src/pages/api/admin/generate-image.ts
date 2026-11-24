@@ -31,11 +31,20 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       .eq('id', 'default')
       .maybeSingle();
 
-    if (cfgErr || (!settings?.ai_api_key && !settings?.image_api_key)) {
+    const effectiveSettings = (settings || {
+      ai_provider: 'gemini',
+      ai_model: 'gemini-2.5-flash',
+      ai_api_key: '',
+      image_provider: 'cloudflare',
+      image_model: '@cf/black-forest-labs/flux-1-schnell',
+    }) as AiSettings;
+
+    const needsKey = effectiveSettings.image_provider !== 'cloudflare';
+    if (cfgErr && needsKey) {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: 'Configure sua chave de API (Gemini ou OpenAI) primeiro em Minha IA (API).',
+          error: 'Configure o provedor de imagem em Minha IA (API) — ou escolha Cloudflare Workers AI (grátis, sem chave).',
         }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
       );
@@ -53,7 +62,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       );
     }
 
-    const generated = await generateCoverImage(settings as AiSettings, {
+    const generated = await generateCoverImage(effectiveSettings, {
       titulo: titulo || customPrompt,
       trilha,
       customPrompt: customPrompt || undefined,

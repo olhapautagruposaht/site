@@ -1,8 +1,9 @@
+import { env as cfEnv } from 'cloudflare:workers';
 import type { PautaPayload } from './editorial-validator';
 import type { TrilhaSlug } from '../data/pautas';
 
 export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'openrouter' | 'custom';
-export type ImageProvider = 'auto' | 'gemini' | 'openai';
+export type ImageProvider = 'auto' | 'cloudflare' | 'huggingface' | 'fal' | 'gemini' | 'openai';
 
 export interface AiSettings {
   ai_provider: AiProvider;
@@ -367,23 +368,137 @@ export async function generateCoverImage(
   settings: AiSettings,
   input: { titulo: string; trilha: string; customPrompt?: string }
 ): Promise<{ bytes: Uint8Array; contentType: string; ext: string; providerUsed: string }> {
-  const resolvedProvider: 'gemini' | 'openai' =
+  const resolvedProvider: Exclude<ImageProvider, 'auto'> =
     settings.image_provider && settings.image_provider !== 'auto'
       ? settings.image_provider
       : settings.ai_provider === 'gemini'
         ? 'gemini'
-        : 'openai';
-
-  const apiKey = settings.image_api_key?.trim() || settings.ai_api_key?.trim();
-  if (!apiKey) {
-    throw new Error('Configure sua chave de API em Minha IA (API) para gerar capas.');
-  }
+        : settings.ai_provider === 'openai'
+          ? 'openai'
+          : 'cloudflare';
 
   const subject =
     input.customPrompt?.trim() ||
     `Editorial magazine cover photograph representing: "${input.titulo}" (category: ${input.trilha}).`;
 
   const artDirection = `${subject} Style: Apple Newsroom editorial photography, ultra-clean minimalist studio lighting, high visual contrast, shallow depth of field, modern technology aesthetic, subtle red accent detail, 16:9 widescreen composition. STRICTLY NO text, NO letters, NO words, NO logos, NO watermarks.`;
+
+  // 1. Cloudflare Workers AI (100% FREE inside your Cloudflare account — zero API key!)
+  if (resolvedProvider === 'cloudflare') {
+    const aiBinding = (cfEnv as { AI?: { run: (model: string, input: Record<string, unknown>) => Promise<unknown> } })?.AI;
+    if (!aiBinding) {
+      throw new Error('Binding Cloudflare Workers AI não disponível neste ambiente (funciona direto em produção na Cloudflare).');
+    }
+    const model =
+      settings.image_model?.trim() && settings.image_model.startsWith('@cf/')
+        ? settings.image_model.trim()
+        : '@cf/black-forest-labs/flux-1-schnell';
+
+    const params: Record<string, unknown> = model.includes('flux')
+      ? { prompt: artDirection, steps: 6 }
+      : { prompt: artDirection, width: 1024, height: 576 };
+
+    const result = await aiBinding.run(model, params);
+    if (result && typeof result === 'object' && 'image' in result && typeof (result as { image?: string }).image === 'string') {
+      return {
+        bytes: base64ToUint8Array((result as { image: string }).image),
+        contentType: 'image/jpeg',
+        ext: 'jpg',
+        providerUsed: `cloudflare:${model}`,
+      };
+    }
+    if (result instanceof ReadableStream) {
+      const buf = new Uint8Array(await new Response(result).arrayBuffer());
+      return {
+        bytes: buf,
+        contentType: 'image/png',
+        ext: 'png',
+        providerUsed: `cloudflare:${model}`,
+      };
+    }
+    if (result instanceof Uint8Array) {
+      return {
+        bytes: result,
+        contentType: 'image/png',
+        ext: 'png',
+        providerUsed: `cloudflare:${model}`,
+      };
+    }
+    throw new Error('Cloudflare Workers AI não retornou bytes de imagem.');
+  }
+
+  const apiKey = settings.image_api_key?.trim() || settings.ai_api_key?.trim();
+  if (!apiKey) {
+    throw new Error('Configure sua chave de API em Minha IA (API) — ou selecione "Cloudflare Workers AI (Grátis, sem chave)".');
+  }
+
+  // 2. Hugging Face Inference (Free tier with hf_... token, native 16:9 FLUX.1-schnell)
+  if (resolvedProvider === 'huggingface') {
+    const model =
+      settings.image_model?.trim() && settings.image_model.includes('/') && !settings.image_model.startsWith('@cf/')
+        ? settings.image_model.trim()
+        : 'black-forest-labs/FLUX.1-schnell';
+    const res = await fetch(`https://router.huggingface.co/hf-inference/models/${model}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: artDirection,
+        parameters: { width: 1280, height: 720, num_inference_steps: 4 },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Hugging Face HTTP ${res.status}: ${err.slice(0, 240)}`);
+    }
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return {
+      bytes,
+      contentType,
+      ext: contentType.includes('png') ? 'png' : 'jpg',
+      providerUsed: `huggingface:${model}`,
+    };
+  }
+
+  // 3. fal.ai (Ultra-cheap FLUX Schnell / FLUX Pro, native landscape_16_9)
+  if (resolvedProvider === 'fal') {
+    const model =
+      settings.image_model?.trim() && settings.image_model.startsWith('fal-ai/')
+        ? settings.image_model.trim()
+        : 'fal-ai/flux/schnell';
+    const res = await fetch(`https://fal.run/${model}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: artDirection,
+        image_size: 'landscape_16_9',
+        num_images: 1,
+        output_format: 'jpeg',
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`fal.ai HTTP ${res.status}: ${err.slice(0, 240)}`);
+    }
+    const data = (await res.json()) as { images?: { url?: string; content_type?: string }[] };
+    const imgUrl = data.images?.[0]?.url;
+    if (!imgUrl) throw new Error('fal.ai não retornou URL da imagem.');
+    const imgRes = await fetch(imgUrl);
+    const bytes = new Uint8Array(await imgRes.arrayBuffer());
+    const contentType = data.images?.[0]?.content_type || imgRes.headers.get('content-type') || 'image/jpeg';
+    return {
+      bytes,
+      contentType,
+      ext: contentType.includes('png') ? 'png' : 'jpg',
+      providerUsed: `fal:${model}`,
+    };
+  }
 
   if (resolvedProvider === 'gemini') {
     const model = settings.image_model?.trim() || 'imagen-3.0-generate-002';

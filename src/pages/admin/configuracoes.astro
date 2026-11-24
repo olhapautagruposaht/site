@@ -144,9 +144,12 @@ if (client) {
               name="image_provider"
               class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm"
             >
-              <option value="auto" selected={current.image_provider === 'auto'}>Automático (usa o mesmo da redação)</option>
+              <option value="cloudflare" selected={current.image_provider === 'cloudflare'}>Cloudflare Workers AI (GRÁTIS · sem chave!)</option>
+              <option value="huggingface" selected={current.image_provider === 'huggingface'}>Hugging Face (Grátis · FLUX.1 16:9 · token hf_...)</option>
+              <option value="fal" selected={current.image_provider === 'fal'}>fal.ai (FLUX Schnell / Pro · 16:9 baratinho)</option>
               <option value="gemini" selected={current.image_provider === 'gemini'}>Google Imagen / Gemini Image</option>
               <option value="openai" selected={current.image_provider === 'openai'}>OpenAI (gpt-image-1 / dall-e-3)</option>
+              <option value="auto" selected={current.image_provider === 'auto'}>Automático (usa o mesmo da redação)</option>
             </select>
           </div>
 
@@ -222,8 +225,14 @@ if (client) {
     });
 
     imgProviderEl?.addEventListener('change', () => {
-      if (imgProviderEl.value === 'openai') imgModelEl.value = 'gpt-image-1';
-      else if (imgProviderEl.value === 'gemini') imgModelEl.value = 'imagen-3.0-generate-002';
+      const map = {
+        cloudflare: '@cf/black-forest-labs/flux-1-schnell',
+        huggingface: 'black-forest-labs/FLUX.1-schnell',
+        fal: 'fal-ai/flux/schnell',
+        gemini: 'imagen-3.0-generate-002',
+        openai: 'gpt-image-1',
+      };
+      if (map[imgProviderEl.value]) imgModelEl.value = map[imgProviderEl.value];
     });
 
     const showMsg = (ok, text) => {
