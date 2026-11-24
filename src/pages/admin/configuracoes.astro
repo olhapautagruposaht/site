@@ -342,17 +342,27 @@ if (client) {
     });
 
     document.getElementById('test-ai-btn').addEventListener('click', async () => {
-      showMsg(true, 'Testando conexão com o modelo selecionado...');
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getBody()),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showMsg(true, `Conexão OK com ${modelEl.value}! Resposta: ${data.reply || 'ok'}`);
-      } else {
-        showMsg(false, `Falha no teste: ${data.error || 'Verifique a chave e o modelo.'}`);
+      const btn = document.getElementById('test-ai-btn');
+      btn.disabled = true;
+      btn.textContent = 'Testando...';
+      showMsg(true, `Testando conexão com ${modelEl.value}...`);
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(getBody()),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          showMsg(true, `Conexão OK com ${modelEl.value}! Resposta: ${data.reply || 'ok'}`);
+        } else {
+          showMsg(false, `Falha no teste: ${data.error || 'Verifique a chave e o modelo.'}`);
+        }
+      } catch (err) {
+        showMsg(false, `Erro de rede no teste: ${err.message || 'tente novamente'}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Testar conexão da IA';
       }
     });
 

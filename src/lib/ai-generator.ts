@@ -271,15 +271,49 @@ function extractJsonObject(raw: string): string {
 export async function testAiConnection(
   settings: AiSettings
 ): Promise<{ ok: boolean; reply?: string; error?: string }> {
+  if (!settings.ai_api_key) {
+    return { ok: false, error: 'Chave de API não informada.' };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const raw = await callProvider(
-      settings,
-      'Responda apenas com este JSON: {"ok": true, "msg": "Conexão validada"}',
-      80
-    );
-    return { ok: true, reply: raw.slice(0, 120) };
+    if (settings.ai_provider === 'gemini') {
+      const model = settings.ai_model || 'gemini-3.8-flash';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.ai_api_key)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Responda apenas: OK' }] }],
+          generationConfig: { maxOutputTokens: 32, temperature: 0 },
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        return { ok: false, error: `Gemini HTTP ${res.status}: ${errText.slice(0, 220)}` };
+      }
+      const data = (await res.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[];
+      };
+      const reply = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(' ').trim();
+      return { ok: true, reply: reply || 'OK (conectado)' };
+    }
+
+    const raw = await callProvider(settings, 'Responda apenas: OK', 64);
+    return { ok: true, reply: raw.slice(0, 120) || 'OK (conectado)' };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    const msg =
+      err instanceof Error && err.name === 'AbortError'
+        ? 'Tempo limite (15s) atingido. Tente novamente ou escolha um modelo mais rápido (ex: flash).'
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    return { ok: false, error: msg };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
