@@ -7,118 +7,192 @@ if (!auth.ok) {
   return Astro.redirect('/admin/login');
 }
 
+const mask = (k?: string | null) =>
+  !k ? '' : k.length > 10 ? `${k.slice(0, 6)}••••••${k.slice(-4)}` : '••••••••';
+
 const { client } = getServiceSupabase(Astro.locals);
 let current = {
-  ai_provider: 'openai',
-  ai_model: 'gpt-4o-mini',
+  ai_provider: 'gemini',
+  ai_model: 'gemini-2.5-flash',
   ai_base_url: '',
   has_api_key: false,
   masked_api_key: '',
+  has_search_key: false,
+  masked_search_key: '',
+  image_provider: 'auto',
+  image_model: 'imagen-3.0-generate-002',
+  has_image_key: false,
+  masked_image_key: '',
 };
 
 if (client) {
   const { data } = await client.from('admin_settings').select('*').eq('id', 'default').maybeSingle();
   if (data) {
-    const k = data.ai_api_key || '';
     current = {
-      ai_provider: data.ai_provider || 'openai',
-      ai_model: data.ai_model || 'gpt-4o-mini',
+      ai_provider: data.ai_provider || 'gemini',
+      ai_model: data.ai_model || 'gemini-2.5-flash',
       ai_base_url: data.ai_base_url || '',
-      has_api_key: Boolean(k),
-      masked_api_key: k ? (k.length > 10 ? `${k.slice(0, 6)}••••••${k.slice(-4)}` : '••••••••') : '',
+      has_api_key: Boolean(data.ai_api_key),
+      masked_api_key: mask(data.ai_api_key),
+      has_search_key: Boolean(data.search_api_key),
+      masked_search_key: mask(data.search_api_key),
+      image_provider: data.image_provider || 'auto',
+      image_model: data.image_model || 'imagen-3.0-generate-002',
+      has_image_key: Boolean(data.image_api_key),
+      masked_image_key: mask(data.image_api_key),
     };
   }
 }
 ---
 
 <AdminLayout title="Minha IA (BYOK)" activeNav="configuracoes">
-  <div class="max-w-2xl">
-    <h1 class="text-2xl font-bold tracking-tight">
-      Minha IA (API Própria)<span class="text-[#D92B2B]">.</span>
-    </h1>
-    <p class="mt-1.5 text-sm text-black/60">
-      Conecte sua própria chave de API (OpenAI, Gemini, Claude, Grok, OpenRouter ou endpoint compatível) para gerar rascunhos dentro do editor com 1 clique.
-    </p>
+  <div class="max-w-2xl space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">
+        Minha IA (Texto, Busca Web & Capa 16:9)<span class="text-[#D92B2B]">.</span>
+      </h1>
+      <p class="mt-1.5 text-sm text-black/60">
+        Conecte sua própria API para redigir com busca web ao vivo e gerar capas originais 16:9 direto no editor.
+      </p>
+    </div>
 
-    <form id="ai-settings-form" class="mt-6 space-y-5 rounded-3xl border border-black/10 bg-white p-7">
-      <div>
-        <label for="ai_provider" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
-          Provedor de IA
-        </label>
-        <select
-          id="ai_provider"
-          name="ai_provider"
-          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-        >
-          <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-4o / GPT-4.1)</option>
-          <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (Gemini 2.5 Pro / Flash)</option>
-          <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet / Opus)</option>
-          <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 3)</option>
-          <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Qualquer modelo)</option>
-          <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
-        </select>
-      </div>
+    <form id="ai-settings-form" class="space-y-6">
+      <!-- 1. Text AI -->
+      <section class="rounded-3xl border border-black/10 bg-white p-7 space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">1. IA de Redação (Texto)</h2>
 
-      <div>
-        <label for="ai_model" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
-          Modelo
-        </label>
-        <input
-          id="ai_model"
-          name="ai_model"
-          type="text"
-          value={current.ai_model}
-          placeholder="ex: gpt-4o, gemini-2.5-pro, claude-sonnet-4-20250514, grok-3"
-          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-        />
-      </div>
+        <div>
+          <label for="ai_provider" class="block text-xs font-semibold text-black/70">Provedor de IA</label>
+          <select
+            id="ai_provider"
+            name="ai_provider"
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          >
+            <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (já inclui Busca Google nativa!)</option>
+            <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-4.1 / GPT-4o)</option>
+            <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet / Opus)</option>
+            <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok</option>
+            <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos)</option>
+            <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
+          </select>
+        </div>
 
-      <div id="custom-url-wrap" class={current.ai_provider === 'custom' ? '' : 'hidden'}>
-        <label for="ai_base_url" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
-          Base URL (OpenAI-compatible)
-        </label>
-        <input
-          id="ai_base_url"
-          name="ai_base_url"
-          type="url"
-          value={current.ai_base_url}
-          placeholder="https://seu-servidor.com/v1"
-          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-        />
-      </div>
+        <div>
+          <label for="ai_model" class="block text-xs font-semibold text-black/70">Modelo (texto livre)</label>
+          <input
+            id="ai_model"
+            name="ai_model"
+            type="text"
+            value={current.ai_model}
+            placeholder="ex: gemini-2.5-flash, claude-sonnet-4-20250514, gpt-4.1"
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
 
-      <div>
-        <label for="ai_api_key" class="block text-xs font-semibold uppercase tracking-wider text-black/60">
-          Chave de API (API Key)
-        </label>
-        <input
-          id="ai_api_key"
-          name="ai_api_key"
-          type="password"
-          placeholder={current.has_api_key ? `Salva: ${current.masked_api_key} (deixe vazio para manter)` : 'Cole sua chave sk-... / AIza...'}
-          class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
-        />
-        <p class="mt-1.5 text-xs text-black/50">
-          Guardada na tabela privada <code>admin_settings</code> (RLS bloqueado para leitura pública).
+        <div id="custom-url-wrap" class={current.ai_provider === 'custom' ? '' : 'hidden'}>
+          <label for="ai_base_url" class="block text-xs font-semibold text-black/70">Base URL (OpenAI-compatible)</label>
+          <input
+            id="ai_base_url"
+            name="ai_base_url"
+            type="url"
+            value={current.ai_base_url}
+            placeholder="https://seu-servidor.com/v1"
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label for="ai_api_key" class="block text-xs font-semibold text-black/70">Chave de API (API Key)</label>
+          <input
+            id="ai_api_key"
+            name="ai_api_key"
+            type="password"
+            placeholder={current.has_api_key ? `Salva: ${current.masked_api_key} (deixe vazio para manter)` : 'Cole sua chave AIza... / sk-...'}
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+      </section>
+
+      <!-- 2. Live Web Search -->
+      <section class="rounded-3xl border border-black/10 bg-white p-7 space-y-3">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">2. Busca Web ao Vivo</h2>
+        <p class="text-xs text-black/60 leading-relaxed">
+          Se você usa <strong>Google Gemini</strong>, a busca ao vivo no Google já funciona <strong>nativamente sem precisar de chave extra</strong>.
+          Para OpenAI, Claude, Grok ou OpenRouter, você pode adicionar uma chave gratuita do <strong>Tavily</strong> (1.000 buscas/mês grátis) ou colar links de referência direto no editor.
         </p>
-      </div>
+        <div>
+          <label for="search_api_key" class="block text-xs font-semibold text-black/70">Chave Tavily Search (opcional)</label>
+          <input
+            id="search_api_key"
+            name="search_api_key"
+            type="password"
+            placeholder={current.has_search_key ? `Salva: ${current.masked_search_key} (deixe vazio para manter)` : 'tvly-... (opcional)'}
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+      </section>
 
-      <div id="settings-feedback" class="hidden rounded-xl px-4 py-3 text-xs font-medium"></div>
+      <!-- 3. 16:9 Cover Generator -->
+      <section class="rounded-3xl border border-black/10 bg-white p-7 space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-black/50">3. Gerador de Capa 16:9 (Google Discover)</h2>
 
-      <div class="flex flex-wrap items-center gap-3 pt-2">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="image_provider" class="block text-xs font-semibold text-black/70">Provedor de Imagem</label>
+            <select
+              id="image_provider"
+              name="image_provider"
+              class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm"
+            >
+              <option value="auto" selected={current.image_provider === 'auto'}>Automático (usa o mesmo da redação)</option>
+              <option value="gemini" selected={current.image_provider === 'gemini'}>Google Imagen / Gemini Image</option>
+              <option value="openai" selected={current.image_provider === 'openai'}>OpenAI (gpt-image-1 / dall-e-3)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="image_model" class="block text-xs font-semibold text-black/70">Modelo de Imagem</label>
+            <input
+              id="image_model"
+              name="image_model"
+              type="text"
+              value={current.image_model}
+              placeholder="imagen-3.0-generate-002 ou gpt-image-1"
+              class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-3.5 py-2.5 text-sm"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="image_api_key" class="block text-xs font-semibold text-black/70">
+            Chave dedicada para Imagem (opcional — deixe vazio para reusar a chave de cima)
+          </label>
+          <input
+            id="image_api_key"
+            name="image_api_key"
+            type="password"
+            placeholder={current.has_image_key ? `Salva: ${current.masked_image_key} (deixe vazio para manter)` : 'Opcional (se quiser usar Gemini para imagem e Claude para texto)'}
+            class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
+          />
+        </div>
+      </section>
+
+      <div id="settings-feedback" class="hidden rounded-2xl px-4 py-3 text-xs font-medium"></div>
+
+      <div class="flex flex-wrap items-center gap-3">
         <button
           id="save-settings-btn"
           type="submit"
           class="rounded-full bg-[#1D1D1F] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
         >
-          Salvar configurações
+          Salvar tudo
         </button>
         <button
           id="test-ai-btn"
           type="button"
-          class="rounded-full border border-black/15 px-5 py-2.5 text-sm font-semibold text-black/80 hover:bg-black/5 cursor-pointer"
+          class="rounded-full border border-black/15 bg-white px-5 py-2.5 text-sm font-semibold text-black/80 hover:bg-black/5 cursor-pointer"
         >
-          Testar conexão
+          Testar conexão da IA
         </button>
       </div>
     </form>
@@ -127,12 +201,14 @@ if (client) {
   <script is:inline>
     const providerEl = document.getElementById('ai_provider');
     const modelEl = document.getElementById('ai_model');
+    const imgProviderEl = document.getElementById('image_provider');
+    const imgModelEl = document.getElementById('image_model');
     const baseUrlWrap = document.getElementById('custom-url-wrap');
     const fb = document.getElementById('settings-feedback');
 
     const defaultModels = {
-      openai: 'gpt-4o',
       gemini: 'gemini-2.5-flash',
+      openai: 'gpt-4.1-mini',
       anthropic: 'claude-sonnet-4-20250514',
       grok: 'grok-3',
       openrouter: 'openai/gpt-4o-mini',
@@ -145,9 +221,14 @@ if (client) {
       if (defaultModels[p]) modelEl.value = defaultModels[p];
     });
 
+    imgProviderEl?.addEventListener('change', () => {
+      if (imgProviderEl.value === 'openai') imgModelEl.value = 'gpt-image-1';
+      else if (imgProviderEl.value === 'gemini') imgModelEl.value = 'imagen-3.0-generate-002';
+    });
+
     const showMsg = (ok, text) => {
       fb.textContent = text;
-      fb.className = `rounded-xl px-4 py-3 text-xs font-medium ${
+      fb.className = `rounded-2xl px-4 py-3 text-xs font-medium ${
         ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
       }`;
     };
@@ -157,11 +238,15 @@ if (client) {
       ai_model: modelEl.value.trim(),
       ai_base_url: document.getElementById('ai_base_url').value.trim(),
       ai_api_key: document.getElementById('ai_api_key').value.trim(),
+      search_api_key: document.getElementById('search_api_key').value.trim(),
+      image_provider: imgProviderEl.value,
+      image_model: imgModelEl.value.trim(),
+      image_api_key: document.getElementById('image_api_key').value.trim(),
     });
 
     document.getElementById('ai-settings-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      showMsg(true, 'Salvando...');
+      showMsg(true, 'Salvando configurações...');
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,8 +254,10 @@ if (client) {
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        showMsg(true, 'Configurações salvas! Você já pode gerar pautas com 1 clique no Editor.');
+        showMsg(true, 'Configurações salvas! Busca web ao vivo e gerador de capa 16:9 prontos no Editor.');
         document.getElementById('ai_api_key').value = '';
+        document.getElementById('search_api_key').value = '';
+        document.getElementById('image_api_key').value = '';
       } else {
         showMsg(false, data.error || 'Erro ao salvar.');
       }

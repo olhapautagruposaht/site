@@ -41,6 +41,12 @@ export const GET: APIRoute = async ({ request, cookies, locals }) => {
             ai_base_url: data.ai_base_url || '',
             has_api_key: Boolean(data.ai_api_key),
             masked_api_key: maskKey(data.ai_api_key),
+            has_search_key: Boolean(data.search_api_key),
+            masked_search_key: maskKey(data.search_api_key),
+            image_provider: data.image_provider || 'auto',
+            image_model: data.image_model || 'imagen-3.0-generate-002',
+            has_image_key: Boolean(data.image_api_key),
+            masked_image_key: maskKey(data.image_api_key),
           }
         : {
             ai_provider: 'openai',
@@ -75,11 +81,13 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const body = await request.json();
     const { data: existing } = await client
       .from('admin_settings')
-      .select('ai_api_key')
+      .select('ai_api_key, search_api_key, image_api_key')
       .eq('id', 'default')
       .maybeSingle();
 
     const apiKey = body.ai_api_key?.trim() || existing?.ai_api_key || null;
+    const searchApiKey = body.search_api_key?.trim() || existing?.search_api_key || null;
+    const imageApiKey = body.image_api_key?.trim() || existing?.image_api_key || null;
 
     const { error: dbErr } = await client.from('admin_settings').upsert({
       id: 'default',
@@ -87,6 +95,10 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       ai_model: (body.ai_model || 'gpt-4o-mini').trim(),
       ai_api_key: apiKey,
       ai_base_url: body.ai_base_url?.trim() || null,
+      search_api_key: searchApiKey,
+      image_provider: body.image_provider || 'auto',
+      image_model: (body.image_model || 'imagen-3.0-generate-002').trim(),
+      image_api_key: imageApiKey,
     });
 
     if (dbErr) {

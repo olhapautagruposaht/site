@@ -52,18 +52,20 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     const trilha = (body?.trilha || 'ia') as TrilhaSlug;
     const foco = body?.foco === 'search' ? 'search' : 'discover';
+    const useWebSearch = body?.use_web_search !== false;
     const sourceUrls: string[] = Array.isArray(body?.source_urls)
       ? body.source_urls.filter((u: unknown) => typeof u === 'string' && u.trim())
       : [];
 
-    const draft = await generatePautaDraft(settings as AiSettings, {
+    const { draft, webSearchUsed } = await generatePautaDraft(settings as AiSettings, {
       topic,
       trilha,
       foco,
       sourceUrls,
+      useWebSearch,
     });
 
-    return new Response(JSON.stringify({ ok: true, draft }), {
+    return new Response(JSON.stringify({ ok: true, draft, webSearchUsed }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
     });
