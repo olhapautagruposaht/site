@@ -73,8 +73,10 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       const endpoints: Record<string, string> = {
         openai: 'https://api.openai.com/v1/models',
         grok: 'https://api.x.ai/v1/models',
+        deepseek: 'https://api.deepseek.com/v1/models',
         openrouter: 'https://openrouter.ai/api/v1/models',
         opencode: 'https://opencode.ai/zen/v1/models',
+        opencode_go: 'https://opencode.ai/zen/go/v1/models',
         custom: `${baseUrl.replace(/\/+$/, '')}/models`,
       };
       const url = endpoints[provider];

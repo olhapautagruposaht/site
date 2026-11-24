@@ -2,7 +2,7 @@ import { env as cfEnv } from 'cloudflare:workers';
 import type { PautaPayload } from './editorial-validator';
 import type { TrilhaSlug } from '../data/pautas';
 
-export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'openrouter' | 'opencode' | 'custom';
+export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'deepseek' | 'openrouter' | 'opencode' | 'opencode_go' | 'custom';
 export type ImageProvider = 'auto' | 'cloudflare' | 'huggingface' | 'fal' | 'gemini' | 'openai';
 
 export interface AiSettings {
@@ -36,8 +36,10 @@ const PROVIDER_ENDPOINTS: Record<Exclude<AiProvider, 'custom' | 'anthropic'>, st
   openai: 'https://api.openai.com/v1/chat/completions',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
   grok: 'https://api.x.ai/v1/chat/completions',
+  deepseek: 'https://api.deepseek.com/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   opencode: 'https://opencode.ai/zen/v1/chat/completions',
+  opencode_go: 'https://opencode.ai/zen/go/v1/chat/completions',
 };
 
 const SYSTEM_PROMPT = `Você é o editor-chefe do OlhaPauta (olhapauta.com.br), publicação editorial brasileira de alto padrão sobre Inteligência Artificial, Tecnologia, Segurança, Negócios e Guias práticos.

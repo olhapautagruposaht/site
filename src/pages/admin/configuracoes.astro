@@ -78,8 +78,10 @@ if (client) {
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           >
             <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (inclui Busca Google nativa)</option>
-            <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos numa única chave)</option>
+            <option value="opencode_go" selected={current.ai_provider === 'opencode_go'}>OpenCode Go (assinatura Go · DeepSeek, GLM, Kimi, etc.)</option>
             <option value="opencode" selected={current.ai_provider === 'opencode'}>OpenCode Zen (modelos grátis e frontier)</option>
+            <option value="deepseek" selected={current.ai_provider === 'deepseek'}>DeepSeek (deepseek-chat / deepseek-reasoner)</option>
+            <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos numa única chave)</option>
             <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-6.2 / GPT-6.1)</option>
             <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet 5.5 / Opus 5.5 / Fable 5.2)</option>
             <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 4.7)</option>
@@ -229,12 +231,14 @@ if (client) {
 
     const FALLBACK_TEXT_MODELS = {
       gemini: ['gemini-3.8-flash', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-3.5-flash-lite'],
-      openrouter: ['google/gemini-3.8-flash', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
+      opencode_go: ['glm-5', 'kimi-k2.5', 'minimax-m2.5', 'deepseek-v3'],
       opencode: ['big-pickle', 'minimax-m2.5-free', 'glm-5-free'],
+      deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+      openrouter: ['google/gemini-3.8-flash', 'deepseek/deepseek-chat', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
       openai: ['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra'],
       anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2', 'claude-haiku-5-5'],
       grok: ['grok-4.7', 'grok-4.20'],
-      custom: ['gemini-3.8-flash', 'gpt-6.2-sol'],
+      custom: ['gemini-3.8-flash', 'deepseek-chat'],
     };
 
     const syncKeyPlaceholder = () => {
