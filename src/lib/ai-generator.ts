@@ -108,6 +108,9 @@ async function fetchReferenceSnippets(urls: string[]): Promise<string> {
       const timeout = setTimeout(() => controller.abort(), 4000);
       try {
         const safe = assertSafeExternalUrl(rawUrl);
+        if (/(youtube\.com|youtu\.be)$/i.test(safe.hostname.replace(/^www\./, ''))) {
+          return '';
+        }
         const res = await fetch(safe.toString(), {
           signal: controller.signal,
           redirect: 'error',
@@ -280,35 +283,55 @@ async function callProvider(
     headers['x-opencode-client'] = 'olhapauta-cms';
   }
 
-  const payload: Record<string, unknown> = {
-    model: settings.ai_model,
-    temperature: 0.7,
-    max_tokens: maxTokens,
-    messages: [
-      { role: 'system', content: sysPrompt },
-      { role: 'user', content: userPrompt },
-    ],
+  const runChatRequest = async (useJsonMode: boolean) => {
+    const payload: Record<string, unknown> = {
+      model: settings.ai_model,
+      temperature: 0.7,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    };
+    if (useJsonMode && settings.ai_provider !== 'custom') {
+      payload.response_format = { type: 'json_object' };
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      signal: reqSignal,
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Provedor ${settings.ai_provider} HTTP ${res.status}: ${errText.slice(0, 240)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: {
+        finish_reason?: string;
+        message?: { content?: string | null; reasoning_content?: string | null };
+      }[];
+    };
+    return {
+      content: (data.choices?.[0]?.message?.content || '').trim(),
+      finishReason: data.choices?.[0]?.finish_reason || 'unknown',
+    };
   };
-  if (jsonMode && settings.ai_provider !== 'custom') {
-    payload.response_format = { type: 'json_object' };
+
+  let attempt = await runChatRequest(jsonMode);
+  if (!attempt.content && jsonMode) {
+    // Some reasoning/gateway models return empty content when json_object is set on long outputs
+    attempt = await runChatRequest(false);
   }
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    signal: reqSignal,
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Provedor ${settings.ai_provider} HTTP ${res.status}: ${errText.slice(0, 240)}`);
+  if (!attempt.content) {
+    throw new Error(
+      `O modelo (${settings.ai_model}) retornou conteúdo vazio (finish_reason: ${attempt.finishReason}). Tente novamente ou teste outro modelo em Minha IA.`
+    );
   }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return data.choices?.[0]?.message?.content || '';
+  return attempt.content;
 }
 
 function extractJsonObject(raw: string): string {
@@ -575,12 +598,12 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
 
   let raw = '';
   if (input.useWebSearch && settings.ai_provider === 'gemini') {
-    const gem = await callGeminiWithSearch(settings, userPrompt, 6500);
+    const gem = await callGeminiWithSearch(settings, userPrompt, 8192);
     raw = gem.text;
     discoveredUrls = [...discoveredUrls, ...gem.groundingUrls];
     webSearchUsed = 'gemini-google-search';
   } else {
-    raw = await callProvider(settings, userPrompt, 6500, undefined, true);
+    raw = await callProvider(settings, userPrompt, 12000, undefined, true);
     if (fetchedRefs && webSearchUsed === 'none') {
       webSearchUsed = 'reference-urls';
     }
