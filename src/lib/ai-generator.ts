@@ -214,7 +214,8 @@ async function callProvider(
   settings: AiSettings,
   userPrompt: string,
   maxTokens = 4500,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  jsonMode = false
 ): Promise<string> {
   if (!settings.ai_api_key) {
     throw new Error('Chave de API não configurada em Minha IA (API).');
@@ -270,19 +271,24 @@ async function callProvider(
     headers['x-opencode-client'] = 'olhapauta-cms';
   }
 
+  const payload: Record<string, unknown> = {
+    model: settings.ai_model,
+    temperature: 0.7,
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+  };
+  if (jsonMode && settings.ai_provider !== 'custom') {
+    payload.response_format = { type: 'json_object' };
+  }
+
   const res = await fetch(endpoint, {
     method: 'POST',
     signal: reqSignal,
     headers,
-    body: JSON.stringify({
-      model: settings.ai_model,
-      temperature: 0.7,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -308,6 +314,19 @@ function extractJsonObject(raw: string): string {
     return trimmed.slice(first, last + 1);
   }
   return trimmed;
+}
+
+function parseAiJson<T>(raw: string): T {
+  const cleaned = extractJsonObject(raw)
+    .replace(/[—–]/g, ', ')
+    .replace(/,\s*([}\]])/g, '$1');
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // Fallback: sanitize unescaped control characters inside strings
+    const sanitized = cleaned.replace(/[\u0000-\u001F]+/g, ' ');
+    return JSON.parse(sanitized) as T;
+  }
 }
 
 export async function testAiConnection(
@@ -415,16 +434,15 @@ RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
   let raw = '';
   let groundingUrls: string[] = [];
   if (settings.ai_provider === 'gemini') {
-    const gem = await callGeminiWithSearch(settings, prompt, 2000);
+    const gem = await callGeminiWithSearch(settings, prompt, 3500);
     raw = gem.text;
     groundingUrls = gem.groundingUrls;
     webSearchUsed = 'gemini-google-search';
   } else {
-    raw = await callProvider(settings, prompt, 2000);
+    raw = await callProvider(settings, prompt, 3500, undefined, true);
   }
 
-  const cleaned = extractJsonObject(raw).replace(/[—–]/g, ', ');
-  const parsed = JSON.parse(cleaned) as { suggestions?: TrendingSuggestion[] };
+  const parsed = parseAiJson<{ suggestions?: TrendingSuggestion[] }>(raw);
   const suggestions = (parsed.suggestions || []).slice(0, 5).map((s) => ({
     trilha: (['ia', 'tecnologia', 'seguranca', 'negocios', 'guias'].includes(s.trilha)
       ? s.trilha
@@ -489,19 +507,18 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
 
   let raw = '';
   if (input.useWebSearch && settings.ai_provider === 'gemini') {
-    const gem = await callGeminiWithSearch(settings, userPrompt, 5000);
+    const gem = await callGeminiWithSearch(settings, userPrompt, 6500);
     raw = gem.text;
     discoveredUrls = [...discoveredUrls, ...gem.groundingUrls];
     webSearchUsed = 'gemini-google-search';
   } else {
-    raw = await callProvider(settings, userPrompt, 5000);
+    raw = await callProvider(settings, userPrompt, 6500, undefined, true);
     if (fetchedRefs && webSearchUsed === 'none') {
       webSearchUsed = 'reference-urls';
     }
   }
 
-  const cleaned = extractJsonObject(raw).replace(/[—–]/g, ', ');
-  const parsed = JSON.parse(cleaned) as Partial<PautaPayload>;
+  const parsed = parseAiJson<Partial<PautaPayload>>(raw);
   const mergedSources = Array.from(new Set([...userSources, ...discoveredUrls])).slice(0, 6);
 
   return {
