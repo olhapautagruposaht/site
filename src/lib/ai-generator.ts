@@ -247,6 +247,10 @@ async function callProvider(
     headers['HTTP-Referer'] = 'https://olhapauta.com.br';
     headers['X-Title'] = 'OlhaPauta CMS';
   }
+  if (settings.ai_provider === 'opencode_go' || settings.ai_provider === 'opencode') {
+    headers['x-opencode-session'] = `olhapauta-${crypto.randomUUID()}`;
+    headers['x-opencode-client'] = 'olhapauta-cms';
+  }
 
   const res = await fetch(endpoint, {
     method: 'POST',

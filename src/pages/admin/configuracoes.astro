@@ -288,7 +288,8 @@ if (client) {
     const populateImageModels = (preferred) => {
       const prov = imgProviderEl.value;
       const list = IMAGE_MODELS[prov] || IMAGE_MODELS.cloudflare;
-      populateSelect(imgModelEl, list, preferred || list[0].id);
+      const validPreferred = preferred && list.some((x) => x.id === preferred) ? preferred : list[0].id;
+      populateSelect(imgModelEl, list, validPreferred);
       imgKeyWrap.classList.toggle('hidden', prov === 'cloudflare');
     };
 
