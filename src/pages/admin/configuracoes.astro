@@ -229,18 +229,6 @@ if (client) {
 
     let savedKeysMap = { ...(maskedProviderKeys || {}) };
 
-    const FALLBACK_TEXT_MODELS = {
-      gemini: ['gemini-3.8-flash', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-3.5-flash-lite'],
-      opencode_go: ['deepseek-v4.1-flash', 'kimi-k2.5', 'minimax-m2.5'],
-      opencode: ['big-pickle', 'minimax-m2.5-free', 'glm-5-free'],
-      deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-      openrouter: ['google/gemini-3.8-flash', 'deepseek/deepseek-chat', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
-      openai: ['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra'],
-      anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2', 'claude-haiku-5-5'],
-      grok: ['grok-4.7', 'grok-4.20'],
-      custom: ['gemini-3.8-flash', 'deepseek-chat'],
-    };
-
     const syncKeyPlaceholder = () => {
       const p = providerEl.value;
       if (savedKeysMap[p]) {
@@ -304,6 +292,11 @@ if (client) {
       image_api_key: document.getElementById('image_api_key').value.trim(),
     });
 
+    const setEmptyModelSelect = (msg) => {
+      modelEl.innerHTML = `<option value="">${msg}</option>`;
+      modelEl.disabled = true;
+    };
+
     const loadLiveModels = async (silent = false) => {
       const prov = providerEl.value;
       if (!silent) modelStatusEl.textContent = 'Buscando modelos disponíveis direto na API do provedor...';
@@ -315,20 +308,22 @@ if (client) {
         });
         const data = await res.json();
         if (!res.ok || !data.ok || !Array.isArray(data.models) || data.models.length === 0) {
-          throw new Error(data.error || 'Lista indisponível');
+          throw new Error(data.error || 'Nenhum modelo retornado pela API.');
         }
-        const keep = data.models.includes(modelEl.value) ? modelEl.value : data.models[0];
+        modelEl.disabled = false;
+        const keep = data.models.includes(modelEl.value)
+          ? modelEl.value
+          : data.models.includes(initialModel)
+            ? initialModel
+            : data.models[0];
         populateSelect(modelEl, data.models, keep);
         modelStatusEl.textContent =
           keep !== initialModel
-            ? `${data.models.length} modelos ativos carregados. Clique em "Salvar tudo" para gravar ${keep} no banco.`
+            ? `${data.models.length} modelos ativos carregados. Clique em "Salvar tudo" para gravar ${keep}.`
             : `${data.models.length} modelos ativos carregados direto da sua chave de API.`;
       } catch (err) {
-        const fallback = FALLBACK_TEXT_MODELS[prov] || FALLBACK_TEXT_MODELS.gemini;
-        populateSelect(modelEl, fallback, modelEl.value || fallback[0]);
-        if (!silent) {
-          modelStatusEl.textContent = `Usando lista padrão (${err.message || 'cole sua API Key e clique em Atualizar'}).`;
-        }
+        setEmptyModelSelect('Cole sua API Key e clique em "Atualizar lista da API"');
+        modelStatusEl.textContent = err.message || `Cole a API Key de ${prov} para carregar os modelos reais.`;
       }
     };
 
@@ -344,10 +339,13 @@ if (client) {
       baseUrlWrap.classList.toggle('hidden', p !== 'custom');
       apiKeyEl.value = '';
       syncKeyPlaceholder();
-      const fallback = FALLBACK_TEXT_MODELS[p] || FALLBACK_TEXT_MODELS.gemini;
-      populateSelect(modelEl, fallback, fallback[0]);
-      if (savedKeysMap[p] || p === 'opencode') loadLiveModels(true);
-      else modelStatusEl.textContent = `Cole a API Key de ${p} para carregar os modelos disponíveis na sua conta.`;
+      if (savedKeysMap[p] || p === 'opencode') {
+        setEmptyModelSelect('Carregando modelos da API...');
+        loadLiveModels(false);
+      } else {
+        setEmptyModelSelect(`Cole a API Key de ${p} para carregar os modelos`);
+        modelStatusEl.textContent = `Cole a API Key de ${p} para carregar os modelos reais disponíveis na sua conta.`;
+      }
     });
 
     apiKeyEl.addEventListener('change', () => {
@@ -403,10 +401,14 @@ if (client) {
       }
     });
 
-    // Initial hydration
+    // Initial hydration (zero hardcoded model fallback)
     syncKeyPlaceholder();
-    populateSelect(modelEl, FALLBACK_TEXT_MODELS[providerEl.value] || FALLBACK_TEXT_MODELS.gemini, initialModel);
     populateImageModels(initialImageModel);
-    if (savedKeysMap[providerEl.value] || providerEl.value === 'opencode') loadLiveModels(true);
+    if (savedKeysMap[providerEl.value] || providerEl.value === 'opencode') {
+      setEmptyModelSelect('Carregando modelos reais da API...');
+      loadLiveModels(true);
+    } else {
+      setEmptyModelSelect('Cole sua API Key para carregar os modelos');
+    }
   </script>
 </AdminLayout>

@@ -109,10 +109,18 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const searchApiKey = body.search_api_key?.trim() || existing?.search_api_key || null;
     const imageApiKey = body.image_api_key?.trim() || existing?.image_api_key || null;
 
+    const selectedModel = String(body.ai_model || '').trim();
+    if (!selectedModel) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Selecione um modelo retornado pela API antes de salvar.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+      );
+    }
+
     const { error: dbErr } = await client.from('admin_settings').upsert({
       id: 'default',
       ai_provider: provider,
-      ai_model: (body.ai_model || 'gemini-3.8-flash').trim(),
+      ai_model: selectedModel,
       ai_api_key: activeApiKey,
       provider_keys: vault,
       ai_base_url: safeBaseUrl,
