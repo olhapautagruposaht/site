@@ -283,6 +283,86 @@ export async function testAiConnection(
   }
 }
 
+export interface TrendingSuggestion {
+  trilha: TrilhaSlug;
+  foco: 'discover' | 'search';
+  titulo: string;
+  angulo: string;
+  motivo: string;
+  source_urls?: string[];
+}
+
+export async function discoverTrendingTopics(
+  settings: AiSettings,
+  trilhaFilter: TrilhaSlug | 'all' = 'all'
+): Promise<{ suggestions: TrendingSuggestion[]; webSearchUsed: string }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const trilhaHint =
+    trilhaFilter === 'all'
+      ? 'Misture as 5 editorias oficiais: ia, tecnologia, seguranca, negocios e guias.'
+      : `Foque exclusivamente na editoria "${trilhaFilter}".`;
+
+  let tavilyContext = '';
+  let webSearchUsed = 'none';
+  if (settings.search_api_key && settings.ai_provider !== 'gemini') {
+    const tv = await searchWithTavily(
+      settings.search_api_key,
+      `novidades inteligência artificial tecnologia cibersegurança hoje ${today} Brasil`
+    );
+    tavilyContext = tv.context;
+    if (tv.context) webSearchUsed = 'tavily';
+  }
+
+  const prompt = `Data de hoje: ${today}.
+Você é o editor de pautas do OlhaPauta (olhapauta.com.br). Pesquise o que está EM ALTA HOJE em Inteligência Artificial, Tecnologia, Cibersegurança, Negócios de IA e Guias práticos com forte potencial de cliques no Google Discover e Google Search no Brasil.
+${trilhaHint}
+${tavilyContext ? `\nNOTÍCIAS E TENDÊNCIAS DE HOJE:\n${tavilyContext}\n` : ''}
+Sugira exatamente 5 pautas quentes e concretas (proibido temas genéricos, proibido travessões — ou –, foco no público brasileiro).
+
+RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
+{
+  "suggestions": [
+    {
+      "trilha": "ia | tecnologia | seguranca | negocios | guias",
+      "foco": "discover | search",
+      "titulo": "Título forte de 55 a 80 caracteres sem travessão",
+      "angulo": "Resumo em 1 frase do ângulo concreto que a matéria vai abordar",
+      "motivo": "Por que isso está em alta e vai performar bem no Discover ou Search",
+      "source_urls": ["https://..."]
+    }
+  ]
+}`;
+
+  let raw = '';
+  let groundingUrls: string[] = [];
+  if (settings.ai_provider === 'gemini') {
+    const gem = await callGeminiWithSearch(settings, prompt, 2000);
+    raw = gem.text;
+    groundingUrls = gem.groundingUrls;
+    webSearchUsed = 'gemini-google-search';
+  } else {
+    raw = await callProvider(settings, prompt, 2000);
+  }
+
+  const cleaned = extractJsonObject(raw).replace(/[—–]/g, ', ');
+  const parsed = JSON.parse(cleaned) as { suggestions?: TrendingSuggestion[] };
+  const suggestions = (parsed.suggestions || []).slice(0, 5).map((s) => ({
+    trilha: (['ia', 'tecnologia', 'seguranca', 'negocios', 'guias'].includes(s.trilha)
+      ? s.trilha
+      : 'ia') as TrilhaSlug,
+    foco: (s.foco === 'search' ? 'search' : 'discover') as 'discover' | 'search',
+    titulo: (s.titulo || '').trim(),
+    angulo: (s.angulo || '').trim(),
+    motivo: (s.motivo || '').trim(),
+    source_urls:
+      Array.isArray(s.source_urls) && s.source_urls.length > 0
+        ? s.source_urls.filter((u) => typeof u === 'string' && u.startsWith('http'))
+        : groundingUrls.slice(0, 2),
+  }));
+
+  return { suggestions, webSearchUsed };
+}
+
 export async function generatePautaDraft(
   settings: AiSettings,
   input: {
