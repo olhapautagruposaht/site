@@ -34,7 +34,7 @@ const canonicalUrl = new URL(canonicalPath, 'https://olhapauta.com.br').toString
 const logoLightUrl = '/images/logo-olhapauta.webp';
 const logoDarkUrl = '/images/logo-olhapauta-dark.webp';
 const adsenseClient = import.meta.env.PUBLIC_ADSENSE_CLIENT;
-const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
+const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-FYRPWM4X4W';
 
 const searchIndex = PAUTAS.map((p) => ({
   titulo: p.titulo,
@@ -113,9 +113,19 @@ const searchIndex = PAUTAS.map((p) => ({
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
         <script is:inline define:vars={{ gaId }}>
           window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', gaId);
+          window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+          if (!window.__opGaInit) {
+            window.__opGaInit = true;
+            window.gtag('js', new Date());
+            window.gtag('config', gaId, { send_page_view: false });
+            document.addEventListener('astro:page-load', () => {
+              window.gtag('event', 'page_view', {
+                page_title: document.title,
+                page_location: window.location.href,
+                page_path: window.location.pathname + window.location.search,
+              });
+            });
+          }
         </script>
       </>
     )}
