@@ -6,9 +6,11 @@ export const GET: APIRoute = async () => {
   const pautas = await fetchPublishedPautas();
   const base = 'https://olhapauta.com.br';
 
+  const activeTrilhas = new Set(pautas.map((p) => p.trilha));
+
   const staticUrls = [
     { loc: `${base}/`, priority: '1.0', changefreq: 'daily' },
-    ...TRILHAS.map((t) => ({
+    ...TRILHAS.filter((t) => activeTrilhas.has(t.slug)).map((t) => ({
       loc: `${base}/pautas/${t.slug}`,
       priority: '0.8',
       changefreq: 'daily',

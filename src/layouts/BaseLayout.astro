@@ -33,7 +33,7 @@ const {
 const canonicalUrl = new URL(canonicalPath, 'https://olhapauta.com.br').toString();
 const logoLightUrl = '/images/logo-olhapauta.webp';
 const logoDarkUrl = '/images/logo-olhapauta-dark.webp';
-const adsenseClient = import.meta.env.PUBLIC_ADSENSE_CLIENT;
+const adsenseClient = import.meta.env.PUBLIC_ADSENSE_CLIENT || 'ca-pub-3585760052661264';
 const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || 'G-FYRPWM4X4W';
 
 const searchIndex = PAUTAS.map((p) => ({
