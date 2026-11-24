@@ -195,7 +195,7 @@ async function callProvider(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: settings.ai_model || 'claude-sonnet-4-20250514',
+        model: settings.ai_model || 'claude-sonnet-5-5',
         max_tokens: maxTokens,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
@@ -649,19 +649,19 @@ export async function generateCoverImage(
     };
   }
 
-  // OpenAI Images (gpt-image-1 or dall-e-3)
-  const model = settings.image_model?.trim() && !settings.image_model.includes('imagen')
+  // OpenAI Images (gpt-image-2.6-sunburst / gpt-image-2.6-flare)
+  const model = settings.image_model?.trim() && !settings.image_model.includes('imagen') && !settings.image_model.startsWith('@cf/')
     ? settings.image_model.trim()
-    : 'gpt-image-1';
-  const isDalle3 = model === 'dall-e-3';
+    : 'gpt-image-2.6-sunburst';
+  const isLegacyDalle = model.includes('dall-e');
 
   const body: Record<string, unknown> = {
     model,
     prompt: artDirection,
-    size: isDalle3 ? '1792x1024' : '1536x1024',
+    size: isLegacyDalle ? '1792x1024' : '1536x1024',
     n: 1,
   };
-  if (isDalle3) {
+  if (isLegacyDalle) {
     body.response_format = 'b64_json';
     body.quality = 'standard';
   } else {
@@ -687,8 +687,8 @@ export async function generateCoverImage(
   if (item?.b64_json) {
     return {
       bytes: base64ToUint8Array(item.b64_json),
-      contentType: isDalle3 ? 'image/png' : 'image/webp',
-      ext: isDalle3 ? 'png' : 'webp',
+      contentType: isLegacyDalle ? 'image/png' : 'image/webp',
+      ext: isLegacyDalle ? 'png' : 'webp',
       providerUsed: `openai:${model}`,
     };
   }

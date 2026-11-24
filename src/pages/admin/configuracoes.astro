@@ -68,25 +68,35 @@ if (client) {
             name="ai_provider"
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           >
-            <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (já inclui Busca Google nativa!)</option>
-            <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-4.1 / GPT-4o)</option>
-            <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet / Opus)</option>
-            <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok</option>
+            <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (Gemini 3.8 / 4 + Busca Google nativa)</option>
+            <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-6.2 / GPT-6.1)</option>
+            <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet 5.5 / Opus 5.5 / Fable 5.2)</option>
+            <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 4.7)</option>
             <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos)</option>
             <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
           </select>
         </div>
 
         <div>
-          <label for="ai_model" class="block text-xs font-semibold text-black/70">Modelo (texto livre)</label>
+          <div class="flex items-center justify-between gap-2">
+            <label for="ai_model" class="block text-xs font-semibold text-black/70">Modelo (texto livre ou clique em buscar)</label>
+            <button
+              id="btn-list-models"
+              type="button"
+              class="text-xs font-semibold text-[#D92B2B] hover:underline cursor-pointer"
+            >
+              ↻ Buscar modelos ativos na API
+            </button>
+          </div>
           <input
             id="ai_model"
             name="ai_model"
             type="text"
             value={current.ai_model}
-            placeholder="ex: gemini-3.8-flash, claude-sonnet-4-20250514, gpt-4.1"
+            placeholder="ex: gemini-3.8-flash, gemini-4-neon, claude-sonnet-5-5, gpt-6.2-sol, grok-4.7"
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           />
+          <div id="live-models-wrap" class="mt-2 hidden flex flex-wrap gap-1.5"></div>
         </div>
 
         <div id="custom-url-wrap" class={current.ai_provider === 'custom' ? '' : 'hidden'}>
@@ -211,11 +221,11 @@ if (client) {
 
     const defaultModels = {
       gemini: 'gemini-3.8-flash',
-      openai: 'gpt-4.1-mini',
-      anthropic: 'claude-sonnet-4-20250514',
-      grok: 'grok-3',
-      openrouter: 'openai/gpt-4o-mini',
-      custom: 'gpt-4o-mini',
+      openai: 'gpt-6.2-sol',
+      anthropic: 'claude-sonnet-5-5',
+      grok: 'grok-4.7',
+      openrouter: 'google/gemini-3.8-flash',
+      custom: 'gemini-3.8-flash',
     };
 
     providerEl?.addEventListener('change', () => {
@@ -229,10 +239,38 @@ if (client) {
         cloudflare: '@cf/black-forest-labs/flux-1-schnell',
         huggingface: 'black-forest-labs/FLUX.1-schnell',
         fal: 'fal-ai/flux/schnell',
-        gemini: 'imagen-3.0-generate-002',
-        openai: 'gpt-image-1',
+        gemini: 'gemini-2.5-flash-image',
+        openai: 'gpt-image-2.6-sunburst',
       };
       if (map[imgProviderEl.value]) imgModelEl.value = map[imgProviderEl.value];
+    });
+
+    document.getElementById('btn-list-models')?.addEventListener('click', async () => {
+      const wrap = document.getElementById('live-models-wrap');
+      showMsg(true, 'Consultando modelos ativos na sua chave de API...');
+      const res = await fetch('/api/admin/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getBody()),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showMsg(false, data.error || 'Não foi possível listar modelos.');
+        return;
+      }
+      wrap.innerHTML = (data.models || [])
+        .map(
+          (id) =>
+            `<button type="button" data-pick-model="${id}" class="rounded-full border border-black/15 bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-mono hover:bg-black hover:text-white transition-colors cursor-pointer">${id}</button>`
+        )
+        .join('');
+      wrap.classList.remove('hidden');
+      wrap.querySelectorAll('[data-pick-model]').forEach((b) => {
+        b.addEventListener('click', () => {
+          modelEl.value = b.dataset.pickModel;
+        });
+      });
+      showMsg(true, `${data.models.length} modelos ativos carregados! Clique em um chip para selecionar.`);
     });
 
     const showMsg = (ok, text) => {
