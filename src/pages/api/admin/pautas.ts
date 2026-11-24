@@ -10,6 +10,7 @@ import {
   slugify,
   type PautaPayload,
 } from '../../../lib/editorial-validator';
+import { getEditorialRhythmMetrics } from '../../../lib/editorial-schedule';
 
 const INDEXNOW_KEY = '9f4c2a8e1b7d4065a3c9e2f8d1b4a6c0';
 
@@ -100,9 +101,26 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
   }
 
   try {
-    const payload = (await request.json()) as PautaPayload & { force?: boolean };
+    const payload = (await request.json()) as PautaPayload & {
+      force?: boolean;
+      scheduled_at?: string | null;
+    };
     const status = payload.status || 'draft';
     const quality = evaluatePautaQuality(payload);
+
+    let scheduledDate: Date | null = null;
+    if (status === 'published' && payload.scheduled_at) {
+      const parsed = new Date(payload.scheduled_at);
+      if (Number.isNaN(parsed.getTime())) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Data de agendamento inválida.' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+        );
+      }
+      if (parsed.getTime() > Date.now() + 60 * 1000) {
+        scheduledDate = parsed;
+      }
+    }
 
     // Only human cookie session can override Quality Gate; external API keys must pass cleanly
     const canForce = auth.via === 'cookie' && Boolean(payload.force);
@@ -151,19 +169,25 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     let result;
     if (payload.id) {
       if (status === 'published') {
-        const { data: existingRow } = await client
-          .from('pautas')
-          .select('published_at')
-          .eq('id', payload.id)
-          .maybeSingle();
-        if (!existingRow?.published_at) {
-          record.published_at = new Date().toISOString();
+        if (scheduledDate) {
+          record.published_at = scheduledDate.toISOString();
+        } else {
+          const { data: existingRow } = await client
+            .from('pautas')
+            .select('published_at')
+            .eq('id', payload.id)
+            .maybeSingle();
+          const existingTs = existingRow?.published_at ? new Date(existingRow.published_at).getTime() : 0;
+          // Se ainda não tinha data ou estava agendada para o futuro e o editor clicou "Publicar agora", publica já
+          if (!existingRow?.published_at || existingTs > Date.now()) {
+            record.published_at = new Date().toISOString();
+          }
         }
       }
       result = await client.from('pautas').update(record).eq('id', payload.id).select('*').single();
     } else {
       if (status === 'published') {
-        record.published_at = new Date().toISOString();
+        record.published_at = scheduledDate ? scheduledDate.toISOString() : new Date().toISOString();
       }
       result = await client.from('pautas').insert(record).select('*').single();
     }
@@ -176,16 +200,27 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
 
     let indexNowSent = false;
-    if (status === 'published' && result.data?.slug) {
+    if (status === 'published' && !scheduledDate && result.data?.slug) {
       indexNowSent = await notifyIndexNow(result.data.slug);
     }
+
+    const { data: schedRows } = await client
+      .from('pautas')
+      .select('status, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(60);
+    const rhythm = getEditorialRhythmMetrics(schedRows || []);
 
     return new Response(
       JSON.stringify({
         ok: true,
         pauta: result.data,
         quality,
+        scheduled: Boolean(scheduledDate),
+        scheduledAt: scheduledDate ? scheduledDate.toISOString() : null,
         indexNowSent,
+        rhythm,
         url: `https://olhapauta.com.br/pauta/${result.data.slug}`,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }

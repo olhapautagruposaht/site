@@ -1,0 +1,20 @@
+name: Editorial Prime-Time IndexNow Ping
+
+on:
+  schedule:
+    # 08:05 BRT (11:05 UTC), 12:35 BRT (15:35 UTC), 18:35 BRT (21:35 UTC)
+    - cron: '5 11 * * *'
+    - cron: '35 15 * * *'
+    - cron: '35 21 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-indexnow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify IndexNow for newly live scheduled pautas
+        if: ${{ secrets.ADMIN_API_KEY != '' }}
+        run: |
+          curl -fsS -X POST "https://olhapauta.com.br/api/cron/publish-ping" \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_API_KEY }}" \
+            -H "Content-Type: application/json"

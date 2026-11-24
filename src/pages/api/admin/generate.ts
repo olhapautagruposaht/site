@@ -61,6 +61,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       .from('pautas')
       .select('titulo, slug, trilha')
       .eq('status', 'published')
+      .lte('published_at', new Date().toISOString())
       .order('published_at', { ascending: false })
       .limit(10);
 

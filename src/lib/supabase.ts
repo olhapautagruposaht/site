@@ -76,10 +76,12 @@ function mapRowToPauta(row: PautaRow): Pauta {
 export async function fetchPublishedPautas(): Promise<Pauta[]> {
   if (!supabase) return PAUTAS;
 
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from('pautas')
     .select('*')
     .eq('status', 'published')
+    .lte('published_at', nowIso)
     .order('published_at', { ascending: false });
 
   if (error || !data || data.length === 0) {

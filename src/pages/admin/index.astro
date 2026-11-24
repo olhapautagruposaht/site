@@ -1,6 +1,11 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getServiceSupabase, isAdminAuthenticated } from '../../lib/admin-auth';
+import {
+  formatBrtDateTime,
+  getEditorialRhythmMetrics,
+  isScheduledPauta,
+} from '../../lib/editorial-schedule';
 
 const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
 if (!auth.ok) {
@@ -24,8 +29,12 @@ if (client) {
   }
 }
 
+const now = new Date();
+const rhythm = getEditorialRhythmMetrics(pautas, now);
+
 const statusLabels: Record<string, { label: string; cls: string }> = {
   published: { label: 'Publicada', cls: 'bg-emerald-100 text-emerald-800' },
+  scheduled: { label: 'Agendada', cls: 'bg-blue-100 text-blue-800' },
   review: { label: 'Revisão', cls: 'bg-amber-100 text-amber-800' },
   draft: { label: 'Rascunho', cls: 'bg-black/10 text-black/70' },
   archived: { label: 'Arquivada', cls: 'bg-red-100 text-red-700' },
@@ -58,8 +67,66 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
     </div>
   )}
 
+  <!-- Painel Automático das 4 Regras de Ouro (Consistência, Horários Nobres, Search Console) -->
+  <section class="mt-6 grid gap-4 md:grid-cols-3">
+    <div class="rounded-3xl border border-black/10 bg-white p-5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-black/45">Ritmo Hoje (Meta)</span>
+        <span id="rhythm-badge" class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+          {rhythm.publishedToday} / 3 hoje
+        </span>
+      </div>
+      <p id="rhythm-summary" class="mt-2 text-sm font-semibold text-[#1D1D1F]">
+        {rhythm.publishedToday >= 3
+          ? 'Meta diária batida. Agende as próximas para o próximo horário nobre.'
+          : `Faltam ${3 - rhythm.publishedToday} pauta(s) para fechar o ritmo ideal de hoje.`}
+      </p>
+      <p class="mt-1 text-xs text-black/55">
+        Últimos 7 dias: <strong>{rhythm.publishedLast7Days}</strong> publicadas · Consistência vence volume.
+      </p>
+    </div>
+
+    <div class="rounded-3xl border border-black/10 bg-white p-5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-black/45">Horários Nobres Discover</span>
+        <span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-800">
+          {rhythm.scheduledTotal} na fila
+        </span>
+      </div>
+      <p class="mt-2 text-sm font-semibold text-[#1D1D1F]">
+        Próximo horário livre: <span id="next-prime-slot" class="text-[#D92B2B]">{rhythm.nextSlotNormal.label}</span>
+      </p>
+      <p class="mt-1 text-xs text-black/55">
+        Janelas automáticas: <strong>08h00</strong>, <strong>12h30</strong> e <strong>18h30</strong> (BRT).
+      </p>
+    </div>
+
+    <div class="rounded-3xl border border-black/10 bg-white p-5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-black/45">Termômetro Search Console</span>
+        <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-black/70 cursor-pointer">
+          <input id="caution-mode-toggle" type="checkbox" class="h-3.5 w-3.5 rounded accent-[#D92B2B]" />
+          Modo Cautela (2/dia)
+        </label>
+      </div>
+      <p class="mt-2 text-xs text-black/65 leading-relaxed">
+        {rhythm.oldestRecentCheckNeeded
+          ? 'Você tem pautas com mais de 3 dias. Confira se já indexaram; se alguma travou, ative o Modo Cautela.'
+          : 'Se notar pautas sem indexar por mais de 3 dias, ative o Modo Cautela para reduzir automaticamente para 2/dia (08h00 e 18h30).'}
+      </p>
+      <a
+        href="https://search.google.com/search-console/index?resource_id=sc-domain:olhapauta.com.br"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-[#D92B2B] hover:underline"
+      >
+        Abrir Indexação no Search Console ↗
+      </a>
+    </div>
+  </section>
+
   <div class="mt-6 flex flex-wrap gap-2" id="status-filters">
-    {(['all', 'published', 'review', 'draft', 'archived'] as const).map((st) => (
+    {(['all', 'published', 'scheduled', 'review', 'draft', 'archived'] as const).map((st) => (
       <button
         type="button"
         data-status={st}
@@ -89,15 +156,19 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
     ) : (
       <div class="divide-y divide-black/10" id="pautas-list">
         {pautas.map((p) => {
-          const st = statusLabels[p.status] || statusLabels.draft;
+          const scheduled = isScheduledPauta(p, now);
+          const effectiveStatus = scheduled ? 'scheduled' : p.status;
+          const st = statusLabels[effectiveStatus] || statusLabels.draft;
           return (
             <div
-              data-row-status={p.status}
+              data-row-status={effectiveStatus}
               class="pauta-item flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between hover:bg-black/[0.015] transition-colors"
             >
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                  <span class={`rounded-full px-2.5 py-0.5 font-semibold ${st.cls}`}>{st.label}</span>
+                  <span class={`rounded-full px-2.5 py-0.5 font-semibold ${st.cls}`}>
+                    {scheduled ? `Agendada · ${formatBrtDateTime(p.published_at)}` : st.label}
+                  </span>
                   <span class="font-semibold uppercase tracking-wider text-[#D92B2B]">{p.trilha_label}</span>
                   <span class="text-black/45">· {p.tempo_leitura}</span>
                 </div>
@@ -106,7 +177,7 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
               </div>
 
               <div class="flex shrink-0 items-center gap-2 text-xs font-semibold">
-                {p.status === 'published' && (
+                {p.status === 'published' && !scheduled && (
                   <a
                     href={`/pauta/${p.slug}`}
                     target="_blank"
@@ -136,7 +207,47 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
     )}
   </div>
 
-  <script is:inline>
+  <script define:vars={{
+    publishedToday: rhythm.publishedToday,
+    nextNormalLabel: rhythm.nextSlotNormal.label,
+    nextCautionLabel: rhythm.nextSlotCaution.label,
+  }}>
+    const CAUTION_KEY = 'op_admin_caution_mode';
+    const toggle = document.getElementById('caution-mode-toggle');
+    const badge = document.getElementById('rhythm-badge');
+    const summary = document.getElementById('rhythm-summary');
+    const nextSlotEl = document.getElementById('next-prime-slot');
+
+    const applyCautionUi = (caution) => {
+      const limit = caution ? 2 : 3;
+      if (badge) {
+        badge.textContent = `${publishedToday} / ${limit} hoje`;
+        badge.className = `rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+          publishedToday >= limit ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+        }`;
+      }
+      if (summary) {
+        summary.textContent =
+          publishedToday >= limit
+            ? 'Meta diária batida. Agende as próximas para o próximo horário nobre.'
+            : `Faltam ${limit - publishedToday} pauta(s) para fechar o ritmo ideal de hoje.`;
+      }
+      if (nextSlotEl) {
+        nextSlotEl.textContent = caution ? nextCautionLabel : nextNormalLabel;
+      }
+    };
+
+    try {
+      const saved = localStorage.getItem(CAUTION_KEY) === '1';
+      if (toggle) toggle.checked = saved;
+      applyCautionUi(saved);
+      toggle?.addEventListener('change', () => {
+        const active = Boolean(toggle.checked);
+        localStorage.setItem(CAUTION_KEY, active ? '1' : '0');
+        applyCautionUi(active);
+      });
+    } catch {}
+
     const pills = document.querySelectorAll('.status-pill');
     const rows = document.querySelectorAll('.pauta-item');
 

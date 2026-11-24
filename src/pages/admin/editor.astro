@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getServiceSupabase, isAdminAuthenticated } from '../../lib/admin-auth';
 import { TRILHAS } from '../../data/pautas';
+import { getEditorialRhythmMetrics } from '../../lib/editorial-schedule';
 
 const auth = await isAdminAuthenticated(Astro.request, Astro.cookies, Astro.locals);
 if (!auth.ok) {
@@ -12,21 +13,34 @@ const editId = Astro.url.searchParams.get('id');
 const { client } = getServiceSupabase(Astro.locals);
 
 let initialPauta: Record<string, unknown> | null = null;
-let publishedLinks: { titulo: string; slug: string; trilha_label: string }[] = [];
+let publishedLinks: { titulo: string; slug: string; trilha_label: string; trilha?: string }[] = [];
+let allScheduleRows: { status?: string; published_at?: string | null }[] = [];
 
 if (client) {
   if (editId) {
     const { data } = await client.from('pautas').select('*').eq('id', editId).maybeSingle();
     if (data) initialPauta = data;
   }
+  const nowIso = new Date().toISOString();
   const { data: pub } = await client
     .from('pautas')
-    .select('titulo, slug, trilha_label')
+    .select('titulo, slug, trilha, trilha_label')
+    .eq('status', 'published')
+    .lte('published_at', nowIso)
+    .order('published_at', { ascending: false })
+    .limit(12);
+  if (pub) publishedLinks = pub;
+
+  const { data: sched } = await client
+    .from('pautas')
+    .select('status, published_at')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
-    .limit(8);
-  if (pub) publishedLinks = pub;
+    .limit(60);
+  if (sched) allScheduleRows = sched;
 }
+
+const rhythm = getEditorialRhythmMetrics(allScheduleRows);
 ---
 
 <AdminLayout title={editId ? 'Editar Pauta' : 'Nova Pauta'} activeNav="editor">
@@ -45,6 +59,14 @@ if (client) {
         class="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold text-[#1D1D1F] hover:bg-black/5 cursor-pointer"
       >
         Salvar rascunho
+      </button>
+      <button
+        id="btn-schedule-prime"
+        type="button"
+        title="Agenda automaticamente no próximo horário nobre do Google Discover (08h00, 12h30 ou 18h30 BRT) respeitando o limite diário"
+        class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-100 cursor-pointer"
+      >
+        ⏰ Agendar · {rhythm.nextSlotNormal.shortLabel}
       </button>
       <button
         id="btn-publish"
@@ -369,6 +391,23 @@ if (client) {
         </div>
         <p id="q-stats" class="mt-1 text-xs text-black/55">0 palavras · 2 MIN de leitura</p>
         <ul id="q-checks" class="mt-4 space-y-2.5 text-xs"></ul>
+
+        {publishedLinks.length > 0 && (
+          <button
+            id="btn-auto-internal-link"
+            type="button"
+            class="mt-4 hidden w-full rounded-full border border-[#D92B2B]/30 bg-[#D92B2B]/5 px-3.5 py-2 text-xs font-semibold text-[#D92B2B] hover:bg-[#D92B2B]/10 cursor-pointer"
+          >
+            ⚡ Inserir link interno automático
+          </button>
+        )}
+
+        <div class="mt-4 rounded-2xl bg-[#F5F5F7] p-3 text-[11px] text-black/65">
+          <p class="font-bold text-[#1D1D1F]">Toque humano (2 min):</p>
+          <p class="mt-0.5 leading-relaxed">
+            Revise título, 1º parágrafo e confirme a capa 16:9. Hoje: <strong id="editor-rhythm-count">{rhythm.publishedToday}/3</strong> publicadas.
+          </p>
+        </div>
       </div>
 
       <!-- Mobile Discover Card Preview -->
@@ -419,7 +458,7 @@ if (client) {
     </aside>
   </div>
 
-  <script define:vars={{ initialPauta, editId }}>
+  <script define:vars={{ initialPauta, editId, publishedLinks, rhythm }}>
     const AI_CLICHES = [
       'no cenário atual',
       'é importante ressaltar',
@@ -691,6 +730,9 @@ if (client) {
       const hasDashes = /[—–]/.test(fullText);
       const foundCliches = AI_CLICHES.filter((c) => fullText.toLowerCase().includes(c));
 
+      const hasInternalLink = /\/pauta\/[a-z0-9-]+/i.test(fullText);
+      const otherPublished = (publishedLinks || []).filter((item) => item.slug !== p.slug);
+
       const checks = [
         { ok: !hasDashes ? 'pass' : 'fail', label: 'Zero travessões (— / –)', detail: hasDashes ? 'Remova travessões!' : 'OK' },
         { ok: foundCliches.length === 0 ? 'pass' : 'warn', label: 'Sem clichês de IA', detail: foundCliches.length ? foundCliches.join(', ') : 'OK' },
@@ -700,6 +742,19 @@ if (client) {
         { ok: p.tldr.length >= 3 ? 'pass' : 'warn', label: 'O que você precisa saber (3)', detail: `${p.tldr.length}/3` },
         { ok: p.faqs.length >= 3 ? 'pass' : 'warn', label: 'FAQs (FAQPage JSON-LD)', detail: `${p.faqs.length} FAQs` },
       ];
+
+      if (otherPublished.length > 0) {
+        checks.push({
+          ok: hasInternalLink ? 'pass' : 'warn',
+          label: 'Link interno (outra pauta)',
+          detail: hasInternalLink ? 'OK' : 'Recomendado p/ SEO e AdSense',
+        });
+      }
+
+      const autoLinkBtn = $('btn-auto-internal-link');
+      if (autoLinkBtn) {
+        autoLinkBtn.classList.toggle('hidden', otherPublished.length === 0 || hasInternalLink);
+      }
 
       const passed = checks.filter((c) => c.ok === 'pass').length;
       const warned = checks.filter((c) => c.ok === 'warn').length;
@@ -1135,12 +1190,45 @@ if (client) {
       });
     });
 
-    const savePauta = async (statusOverride, force = false) => {
+    const isCautionMode = () => {
+      try {
+        return localStorage.getItem('op_admin_caution_mode') === '1';
+      } catch {
+        return false;
+      }
+    };
+
+    const getActivePrimeSlot = () => (isCautionMode() ? rhythm.nextSlotCaution : rhythm.nextSlotNormal);
+    const getDailyLimit = () => (isCautionMode() ? 2 : 3);
+
+    const refreshScheduleButtonUi = () => {
+      const slot = getActivePrimeSlot();
+      const limit = getDailyLimit();
+      const btn = $('btn-schedule-prime');
+      if (btn && slot) {
+        btn.textContent = `⏰ Agendar · ${slot.shortLabel}`;
+      }
+      const countEl = $('editor-rhythm-count');
+      if (countEl) {
+        countEl.textContent = `${rhythm.publishedToday}/${limit}`;
+      }
+    };
+    refreshScheduleButtonUi();
+
+    const savePauta = async (statusOverride, force = false, scheduledAt = null) => {
       const fb = $('save-feedback');
       fb.className = 'mt-5 rounded-2xl bg-black/5 px-4 py-3 text-xs font-medium text-black/75';
-      fb.textContent = statusOverride === 'published' ? 'Publicando e notificando IndexNow...' : 'Salvando...';
+      fb.textContent = scheduledAt
+        ? 'Agendando pauta no horário nobre do Discover...'
+        : statusOverride === 'published'
+          ? 'Publicando e notificando IndexNow...'
+          : 'Salvando...';
 
-      const payload = { ...collectPayload(statusOverride), force };
+      const payload = {
+        ...collectPayload(statusOverride),
+        force,
+        scheduled_at: scheduledAt || undefined,
+      };
       const res = await fetch('/api/admin/pautas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1150,8 +1238,8 @@ if (client) {
 
       if (res.status === 422 && data.blockers) {
         const msg = data.blockers.join(' | ');
-        if (confirm(`Quality Gate encontrou pendências:\n\n- ${data.blockers.join('\n- ')}\n\nDeseja publicar mesmo assim?`)) {
-          return savePauta(statusOverride, true);
+        if (confirm(`Quality Gate encontrou pendências:\n\n- ${data.blockers.join('\n- ')}\n\nDeseja continuar mesmo assim?`)) {
+          return savePauta(statusOverride, true, scheduledAt);
         }
         fb.className = 'mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-800';
         fb.textContent = `Bloqueado pelo Quality Gate: ${msg}`;
@@ -1165,14 +1253,25 @@ if (client) {
       }
 
       clearLocalAutosave();
-      fb.className = 'mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800';
       if (statusOverride === 'published') {
         const publishedUrl = escHtml(data.url || '');
         const publishedId = encodeURIComponent(data.pauta?.id || '');
+        const activeSlot = getActivePrimeSlot();
+        if (data.rhythm) {
+          Object.assign(rhythm, data.rhythm);
+          refreshScheduleButtonUi();
+        }
         resetEditorForm();
-        fb.innerHTML = `Pauta publicada e editor limpo para a próxima! <a href="${publishedUrl}" target="_blank" rel="noopener noreferrer" class="underline ml-1">Abrir no ar ↗</a>${publishedId ? ` · <a href="/admin/editor?id=${publishedId}" class="underline">Editar esta pauta</a>` : ''} ${data.indexNowSent ? '· IndexNow enviado' : ''}`;
+        if (data.scheduled) {
+          fb.className = 'mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-900';
+          fb.innerHTML = `Pauta agendada para <strong>${escHtml(activeSlot?.label || 'o próximo horário nobre')}</strong>! Ela entra no ar automaticamente.${publishedId ? ` · <a href="/admin/editor?id=${publishedId}" class="underline">Editar esta pauta</a>` : ''}`;
+        } else {
+          fb.className = 'mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800';
+          fb.innerHTML = `Pauta publicada e editor limpo para a próxima! <a href="${publishedUrl}" target="_blank" rel="noopener noreferrer" class="underline ml-1">Abrir no ar ↗</a>${publishedId ? ` · <a href="/admin/editor?id=${publishedId}" class="underline">Editar esta pauta</a>` : ''} ${data.indexNowSent ? '· IndexNow enviado' : ''}`;
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
+        fb.className = 'mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800';
         fb.textContent = 'Rascunho salvo no Supabase!';
         if (!currentEditId && data.pauta?.id) {
           currentEditId = data.pauta.id;
@@ -1182,7 +1281,41 @@ if (client) {
     };
 
     $('btn-save-draft').addEventListener('click', () => savePauta('draft'));
-    $('btn-publish').addEventListener('click', () => savePauta('published'));
+    $('btn-schedule-prime')?.addEventListener('click', () => {
+      const slot = getActivePrimeSlot();
+      savePauta('published', false, slot?.iso || null);
+    });
+    $('btn-publish').addEventListener('click', () => {
+      const limit = getDailyLimit();
+      if (!currentEditId && rhythm.publishedToday >= limit) {
+        const slot = getActivePrimeSlot();
+        if (
+          confirm(
+            `Você já publicou ${rhythm.publishedToday} pauta(s) hoje (meta: ${limit}/dia para consistência no Google).\n\nClique em OK para agendar automaticamente em ${slot?.label || 'próximo horário nobre'}, ou Cancelar para publicar agora mesmo.`
+          )
+        ) {
+          return savePauta('published', false, slot?.iso || null);
+        }
+      }
+      savePauta('published');
+    });
+
+    $('btn-auto-internal-link')?.addEventListener('click', () => {
+      const currentSlug = $('f-slug').value.trim();
+      const currentTrilha = $('f-trilha').value;
+      const candidates = (publishedLinks || []).filter((item) => item.slug !== currentSlug);
+      if (candidates.length === 0) return;
+      const pick = candidates.find((item) => item.trilha === currentTrilha) || candidates[0];
+      const targetIdx = sectionsState.length >= 2 ? 1 : 0;
+      if (!sectionsState[targetIdx]) {
+        sectionsState.push({ heading: '', paragraphs: [''], subsections: [], quote: '', calloutText: '', bullets: '' });
+      }
+      const sentence = `Leia também: [${pick.titulo}](/pauta/${pick.slug}).`;
+      const existingParagraphs = sectionsState[targetIdx].paragraphs.filter((x) => x.trim());
+      sectionsState[targetIdx].paragraphs = [...existingParagraphs, sentence];
+      renderSections();
+      updateQuality();
+    });
 
     document.querySelectorAll('.copy-link-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
