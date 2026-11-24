@@ -28,6 +28,27 @@ const escapeHtmlText = (str: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const formatSourceLabel = (rawUrl: string) => {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.replace(/^www\./, '');
+    const slugPart = u.pathname
+      .split('/')
+      .filter(Boolean)
+      .pop()
+      ?.replace(/\.(html?|ghtml|php)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .trim();
+    if (slugPart && slugPart.length > 6 && !/^\d+$/.test(slugPart)) {
+      const nice = slugPart.charAt(0).toUpperCase() + slugPart.slice(1);
+      return `${host} · ${nice.slice(0, 80)}`;
+    }
+    return host;
+  } catch {
+    return rawUrl;
+  }
+};
+
 // XSS-safe rich paragraph renderer: escapes all HTML first, then converts only strictly validated internal (/pauta/slug) and HTTPS Markdown links
 const INTERNAL_PATH_RE = /^\/pautas?\/[a-z0-9-]+$/;
 const renderRichText = (text: string) => {
@@ -526,7 +547,7 @@ const jsonLd = {
                   rel="noopener noreferrer nofollow"
                   class="underline underline-offset-4 hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)]"
                 >
-                  {srcUrl}
+                  {formatSourceLabel(srcUrl)} ↗
                 </a>
               </li>
             ))}

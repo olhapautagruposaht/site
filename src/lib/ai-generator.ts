@@ -359,6 +359,19 @@ function extractJsonObject(raw: string): string {
   return trimmed;
 }
 
+const LOW_AUTHORITY_SOURCE_HOSTS = /(instagram\.com|tiktok\.com|facebook\.com|pinterest\.com|reddit\.com)$/i;
+
+function isEditorialSourceUrl(raw: string): string {
+  try {
+    const safe = assertSafeExternalUrl(raw);
+    if (safe.username || safe.password) return '';
+    if (LOW_AUTHORITY_SOURCE_HOSTS.test(safe.hostname.replace(/^www\./, ''))) return '';
+    return safe.toString();
+  } catch {
+    return '';
+  }
+}
+
 function parseAiJson<T>(raw: string): T {
   if (!raw || !raw.trim()) {
     throw new Error('O modelo retornou uma resposta vazia. Tente clicar novamente ou trocar de modelo em Minha IA.');
@@ -622,16 +635,9 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
 
   const parsed = parseAiJson<Partial<PautaPayload>>(raw);
   const mergedSources = Array.from(new Set([...userSources, ...discoveredUrls]))
-    .map((u) => {
-      try {
-        const safe = assertSafeExternalUrl(u);
-        return safe.username || safe.password ? '' : safe.toString();
-      } catch {
-        return '';
-      }
-    })
+    .map(isEditorialSourceUrl)
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 5);
 
   return {
     draft: {
