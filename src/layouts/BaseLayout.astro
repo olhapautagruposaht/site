@@ -101,11 +101,27 @@ const searchIndex = PAUTAS.map((p) => ({
     <ClientRouter />
 
     {adsenseClient && (
-      <script
-        async
-        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
-        crossorigin="anonymous"
-      />
+      <>
+        <script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+          crossorigin="anonymous"
+        />
+        <script is:inline>
+          if (!window.__opAdsInit) {
+            window.__opAdsInit = true;
+            const initAds = () => {
+              const slots = document.querySelectorAll('ins.adsbygoogle:not([data-adsbygoogle-status])');
+              slots.forEach(() => {
+                try {
+                  (window.adsbygoogle = window.adsbygoogle || []).push({});
+                } catch {}
+              });
+            };
+            document.addEventListener('astro:page-load', initAds);
+          }
+        </script>
+      </>
     )}
 
     {gaId && (

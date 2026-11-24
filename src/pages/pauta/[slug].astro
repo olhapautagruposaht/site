@@ -358,9 +358,12 @@ const jsonLd = {
               </ul>
             )}
 
-            {/* AdSense In-Article Slot only when there are more sections after it (never stacked ads) */}
+            {/* AdSense In-Article Slots spaced apart (never stacked) */}
             {idx === 0 && pauta.conteudo.length > 1 && (
-              <AdSlot slotName="in-article-1" format="in-article" minHeight="min-h-[250px]" />
+              <AdSlot slotName="in-article-1" slotId="2862621926" format="in-article" minHeight="min-h-[250px]" />
+            )}
+            {idx === 2 && pauta.conteudo.length > 3 && (
+              <AdSlot slotName="in-article-2" slotId="3258385356" format="in-article" minHeight="min-h-[250px]" />
             )}
           </section>
         ))}
@@ -394,8 +397,8 @@ const jsonLd = {
         </section>
       )}
 
-      {/* AdSense End-of-Article Slot */}
-      <AdSlot slotName="after-article" format="display" minHeight="min-h-[250px]" />
+      {/* AdSense End-of-Article Multiplex Slot */}
+      <AdSlot slotName="after-article" slotId="9236458588" format="multiplex" minHeight="min-h-[280px]" />
 
       <!-- Author Credit (E-E-A-T) -->
       <div class="mt-8 flex items-center gap-3 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-6">

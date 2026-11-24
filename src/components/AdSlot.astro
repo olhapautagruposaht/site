@@ -1,38 +1,49 @@
 ---
 interface Props {
   slotName: string;
+  slotId: string;
   format?: 'in-article' | 'display' | 'multiplex';
   minHeight?: string;
 }
 
-const { slotName, format = 'in-article', minHeight = 'min-h-[250px]' } = Astro.props;
+const { slotName, slotId, format = 'in-article', minHeight = 'min-h-[250px]' } = Astro.props;
 const isDev = import.meta.env.DEV;
+const adsenseClient = import.meta.env.PUBLIC_ADSENSE_CLIENT || 'ca-pub-3585760052661264';
+
+const adFormat =
+  format === 'in-article' ? 'fluid' : format === 'multiplex' ? 'autorelaxed' : 'auto';
 ---
 
 <aside
   aria-label="Publicidade"
-  data-ad-slot={slotName}
-  data-ad-format={format}
+  data-ad-name={slotName}
+  data-ad-format-type={format}
   class="my-10 flex flex-col items-center justify-center"
 >
-  <span class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+  <span class="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
     Publicidade
   </span>
   <div
-    class={`w-full ${minHeight} rounded-2xl border border-dashed border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-surface)]/70 dark:bg-[var(--color-dark-surface)]/70 flex flex-col items-center justify-center px-4 text-center`}
+    class={`w-full ${minHeight} rounded-2xl flex flex-col items-center justify-center overflow-hidden ${
+      isDev
+        ? 'border border-dashed border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-surface)]/70 dark:bg-[var(--color-dark-surface)]/70 px-4 text-center'
+        : 'bg-[var(--color-surface)]/40 dark:bg-[var(--color-dark-surface)]/40'
+    }`}
   >
     {isDev ? (
       <div class="text-xs text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-        <p class="font-medium">AdSense Slot · {slotName}</p>
-        <p class="mt-1 text-[11px] opacity-75">Altura reservada ({minHeight}) · CLS = 0</p>
+        <p class="font-medium">AdSense · {slotName} ({slotId})</p>
+        <p class="mt-1 text-[11px] opacity-75">Formato: {format} · Altura reservada ({minHeight}) · CLS = 0</p>
       </div>
     ) : (
       <ins
         class="adsbygoogle block w-full"
         style="display:block; text-align:center;"
+        data-ad-client={adsenseClient}
+        data-ad-slot={slotId}
         data-ad-layout={format === 'in-article' ? 'in-article' : undefined}
-        data-ad-format={format === 'in-article' ? 'fluid' : 'auto'}
-        data-full-width-responsive="true"
+        data-ad-format={adFormat}
+        data-full-width-responsive={format === 'display' ? 'true' : undefined}
       />
     )}
   </div>
