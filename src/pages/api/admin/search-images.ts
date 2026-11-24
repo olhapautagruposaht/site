@@ -27,24 +27,24 @@ function isCommercialFreeLicense(license: string): boolean {
   return FREE_LICENSES.some((ok) => l.includes(ok));
 }
 
-function buildSearchTerms(titulo: string, trilha: string, customQuery?: string): string {
-  if (customQuery?.trim()) return customQuery.trim();
+function buildSearchTerms(titulo: string, trilha: string, customQuery?: string): string[] {
+  if (customQuery?.trim()) return [customQuery.trim()];
   const lower = `${titulo} ${trilha}`.toLowerCase();
-  const map: [RegExp, string][] = [
-    [/openai|chatgpt|gpt/, 'OpenAI artificial intelligence technology'],
-    [/google|gemini/, 'Google technology office silicon valley'],
-    [/apple|iphone|mac/, 'Apple technology smartphone laptop'],
-    [/whatsapp|celular|smartphone|android/, 'smartphone technology hand modern'],
-    [/seguran|golpe|deepfake|cyber|hacker|privacidade|vazamento/, 'cybersecurity server network security'],
-    [/chip|gpu|nvidia|hardware|datacenter|servidor/, 'data center server hardware microchip'],
-    [/agente|autonom|automac|trabalho|empresa|negocio|saas/, 'modern technology office laptop workspace'],
-    [/robo|robot/, 'humanoid robot technology laboratory'],
-    [/ia|inteligencia artificial|modelo|llm/, 'artificial intelligence computer technology server'],
+  const map: [RegExp, string[]][] = [
+    [/openai|chatgpt|gpt/, ['artificial intelligence', 'data center', 'server room']],
+    [/google|gemini/, ['Googleplex', 'data center', 'technology office']],
+    [/apple|iphone|mac/, ['Apple Park', 'iPhone', 'MacBook']],
+    [/whatsapp|celular|smartphone|android/, ['smartphone', 'mobile phone', 'hand holding phone']],
+    [/seguran|golpe|deepfake|cyber|hacker|privacidade|vazamento|ransomware/, ['cybersecurity', 'server room', 'network rack']],
+    [/chip|gpu|nvidia|hardware|datacenter|servidor/, ['data center', 'microchip', 'server room']],
+    [/agente|autonom|automac|trabalho|empresa|negocio|saas/, ['modern office', 'laptop desk', 'software developer']],
+    [/robo|robot/, ['humanoid robot', 'robotics laboratory', 'robot']],
+    [/ia|inteligencia artificial|modelo|llm/, ['data center', 'supercomputer', 'server room']],
   ];
   for (const [re, terms] of map) {
     if (re.test(lower)) return terms;
   }
-  return 'modern technology computer office';
+  return ['data center', 'modern office', 'laptop'];
 }
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
@@ -117,85 +117,89 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       });
     }
 
-    // Mode 1: Search commercial-free landscape high-res photos on Wikimedia Commons
+    // Mode 1: Search commercial-free landscape high-res photos on Wikimedia Commons (with automatic fallback queries)
     const titulo = String(body?.titulo || '').trim();
     const trilha = String(body?.trilha || 'ia').trim();
-    const query = buildSearchTerms(titulo, trilha, body?.query);
+    const queries = buildSearchTerms(titulo, trilha, body?.query);
 
-    const apiUrl = new URL('https://commons.wikimedia.org/w/api.php');
-    apiUrl.searchParams.set('action', 'query');
-    apiUrl.searchParams.set('generator', 'search');
-    apiUrl.searchParams.set('gsrnamespace', '6');
-    apiUrl.searchParams.set('gsrsearch', `${query} filetype:bitmap`);
-    apiUrl.searchParams.set('gsrlimit', '20');
-    apiUrl.searchParams.set('prop', 'imageinfo');
-    apiUrl.searchParams.set('iiprop', 'url|size|extmetadata|mime');
-    apiUrl.searchParams.set('iiurlwidth', '1600');
-    apiUrl.searchParams.set('format', 'json');
+    const searchWikimedia = async (q: string) => {
+      const apiUrl = new URL('https://commons.wikimedia.org/w/api.php');
+      apiUrl.searchParams.set('action', 'query');
+      apiUrl.searchParams.set('generator', 'search');
+      apiUrl.searchParams.set('gsrnamespace', '6');
+      apiUrl.searchParams.set('gsrsearch', `${q} filetype:bitmap`);
+      apiUrl.searchParams.set('gsrlimit', '24');
+      apiUrl.searchParams.set('prop', 'imageinfo');
+      apiUrl.searchParams.set('iiprop', 'url|size|extmetadata|mime');
+      apiUrl.searchParams.set('iiurlwidth', '1600');
+      apiUrl.searchParams.set('format', 'json');
 
-    const res = await fetch(apiUrl.toString(), {
-      headers: { 'User-Agent': 'OlhaPautaCMS/1.0 (+https://olhapauta.com.br)' },
-    });
-    if (!res.ok) {
-      throw new Error(`Wikimedia HTTP ${res.status}`);
-    }
-
-    const data = (await res.json()) as {
-      query?: {
-        pages?: Record<
-          string,
-          {
-            title?: string;
-            imageinfo?: {
-              url?: string;
-              thumburl?: string;
-              width?: number;
-              height?: number;
-              mime?: string;
-              extmetadata?: {
-                LicenseShortName?: { value?: string };
-                Artist?: { value?: string };
-                ImageDescription?: { value?: string };
-              };
-            }[];
-          }
-        >;
+      const res = await fetch(apiUrl.toString(), {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'OlhaPautaCMS/1.0 (+https://olhapauta.com.br)' },
+      });
+      if (!res.ok) throw new Error(`Wikimedia HTTP ${res.status}`);
+      const data = (await res.json()) as {
+        query?: {
+          pages?: Record<
+            string,
+            {
+              title?: string;
+              imageinfo?: {
+                url?: string;
+                thumburl?: string;
+                width?: number;
+                height?: number;
+                mime?: string;
+                extmetadata?: {
+                  LicenseShortName?: { value?: string };
+                  Artist?: { value?: string };
+                };
+              }[];
+            }
+          >;
+        };
       };
+
+      const pages = Object.values(data.query?.pages || {});
+      return pages
+        .map((p) => {
+          const info = p.imageinfo?.[0];
+          if (!info?.url || !info.width || !info.height) return null;
+          if (info.mime && !['image/jpeg', 'image/png', 'image/webp'].includes(info.mime)) return null;
+          const ratio = info.width / info.height;
+          if (info.width < 1200 || ratio < 1.2 || ratio > 2.4) return null;
+
+          const license = stripTags(info.extmetadata?.LicenseShortName?.value || '');
+          if (!isCommercialFreeLicense(license)) return null;
+
+          const artist = stripTags(info.extmetadata?.Artist?.value || 'Wikimedia Commons').slice(0, 60);
+          const cleanFileTitle = (p.title || '').replace(/^File:/i, '').replace(/\.[^.]+$/, '');
+          const suggestedAlt = titulo ? `Imagem ilustrativa da pauta: ${titulo}` : cleanFileTitle;
+
+          return {
+            title: cleanFileTitle,
+            url: info.thumburl || info.url,
+            width: info.width,
+            height: info.height,
+            license,
+            credit: `Foto: ${artist} / ${license} (Wikimedia Commons)`,
+            suggestedAlt,
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 6);
     };
 
-    const pages = Object.values(data.query?.pages || {});
-    const results = pages
-      .map((p) => {
-        const info = p.imageinfo?.[0];
-        if (!info?.url || !info.width || !info.height) return null;
-        if (info.mime && !['image/jpeg', 'image/png', 'image/webp'].includes(info.mime)) return null;
-        // Landscape high-res filter for Google Discover (>= 1000px wide, landscape ratio)
-        const ratio = info.width / info.height;
-        if (info.width < 1000 || ratio < 1.2 || ratio > 2.4) return null;
+    let usedQuery = queries[0];
+    let results: unknown[] = [];
+    for (const q of queries) {
+      usedQuery = q;
+      results = await searchWikimedia(q);
+      if (results.length >= 3) break;
+    }
 
-        const license = stripTags(info.extmetadata?.LicenseShortName?.value || '');
-        if (!isCommercialFreeLicense(license)) return null;
-
-        const artist = stripTags(info.extmetadata?.Artist?.value || 'Wikimedia Commons').slice(0, 60);
-        const cleanFileTitle = (p.title || '').replace(/^File:/i, '').replace(/\.[^.]+$/, '');
-        const suggestedAlt = titulo
-          ? `Imagem ilustrativa da pauta: ${titulo}`
-          : cleanFileTitle;
-
-        return {
-          title: cleanFileTitle,
-          url: info.thumburl || info.url,
-          width: info.width,
-          height: info.height,
-          license,
-          credit: `Foto: ${artist} / ${license} (Wikimedia Commons)`,
-          suggestedAlt,
-        };
-      })
-      .filter(Boolean)
-      .slice(0, 6);
-
-    return new Response(JSON.stringify({ ok: true, query, results }), {
+    return new Response(JSON.stringify({ ok: true, query: usedQuery, results }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS },
     });
