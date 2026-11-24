@@ -137,7 +137,7 @@ async function callGeminiWithSearch(
   userPrompt: string,
   maxTokens = 4500
 ): Promise<{ text: string; groundingUrls: string[] }> {
-  const model = settings.ai_model || 'gemini-2.5-flash';
+  const model = settings.ai_model || 'gemini-3.8-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.ai_api_key)}`;
 
   const res = await fetch(url, {

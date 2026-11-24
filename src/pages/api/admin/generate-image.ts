@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     const effectiveSettings = (settings || {
       ai_provider: 'gemini',
-      ai_model: 'gemini-2.5-flash',
+      ai_model: 'gemini-3.8-flash',
       ai_api_key: '',
       image_provider: 'cloudflare',
       image_model: '@cf/black-forest-labs/flux-1-schnell',

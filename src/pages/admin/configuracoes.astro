@@ -13,7 +13,7 @@ const mask = (k?: string | null) =>
 const { client } = getServiceSupabase(Astro.locals);
 let current = {
   ai_provider: 'gemini',
-  ai_model: 'gemini-2.5-flash',
+  ai_model: 'gemini-3.8-flash',
   ai_base_url: '',
   has_api_key: false,
   masked_api_key: '',
@@ -30,7 +30,7 @@ if (client) {
   if (data) {
     current = {
       ai_provider: data.ai_provider || 'gemini',
-      ai_model: data.ai_model || 'gemini-2.5-flash',
+      ai_model: data.ai_model || 'gemini-3.8-flash',
       ai_base_url: data.ai_base_url || '',
       has_api_key: Boolean(data.ai_api_key),
       masked_api_key: mask(data.ai_api_key),
@@ -84,7 +84,7 @@ if (client) {
             name="ai_model"
             type="text"
             value={current.ai_model}
-            placeholder="ex: gemini-2.5-flash, claude-sonnet-4-20250514, gpt-4.1"
+            placeholder="ex: gemini-3.8-flash, claude-sonnet-4-20250514, gpt-4.1"
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           />
         </div>
@@ -210,7 +210,7 @@ if (client) {
     const fb = document.getElementById('settings-feedback');
 
     const defaultModels = {
-      gemini: 'gemini-2.5-flash',
+      gemini: 'gemini-3.8-flash',
       openai: 'gpt-4.1-mini',
       anthropic: 'claude-sonnet-4-20250514',
       grok: 'grok-3',
