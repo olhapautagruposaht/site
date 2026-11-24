@@ -54,8 +54,8 @@ function mapRowToPauta(row: PautaRow): Pauta {
     dataISO: iso,
     tempoLeitura: row.tempo_leitura,
     autor: {
-      nome: row.autor_nome,
-      cargo: row.autor_cargo,
+      nome: row.autor_nome || 'Jonathas Costa',
+      cargo: row.autor_cargo || 'Fundador & Editor',
     },
     imagem: {
       url: row.imagem_url,

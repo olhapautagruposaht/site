@@ -8,5 +8,6 @@ if (exists) {
   return Astro.redirect(`/pautas/${slug}`, 301);
 }
 
-return Astro.redirect('/404', 404);
+Astro.response.status = 404;
+return Astro.rewrite('/404');
 ---

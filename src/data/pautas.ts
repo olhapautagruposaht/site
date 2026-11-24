@@ -91,8 +91,8 @@ export const PAUTAS: Pauta[] = [
     dataISO: '2026-11-23T09:00:00-03:00',
     tempoLeitura: '6 MIN',
     autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
+      nome: 'Jonathas Costa',
+      cargo: 'Fundador & Editor',
     },
     imagem: {
       url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=1600&q=85',

@@ -8,7 +8,8 @@ const allPautas = await fetchPublishedPautas();
 const currentIndex = allPautas.findIndex((p) => p.slug === slug);
 
 if (currentIndex === -1) {
-  return Astro.redirect('/404', 404);
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
 }
 
 const pauta = allPautas[currentIndex];
@@ -30,21 +31,36 @@ const formattedDate = new Intl.DateTimeFormat('pt-BR', {
   year: 'numeric',
 }).format(new Date(pauta.dataISO));
 
+const authorInitials = pauta.autor.nome
+  .split(' ')
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0]?.toUpperCase() ?? '')
+  .join('');
+
 const graph: Record<string, unknown>[] = [
   {
     '@type': 'Article',
     headline: pauta.titulo,
     description: pauta.subtitulo,
-    image: [pauta.imagem.url],
+    image: [
+      {
+        '@type': 'ImageObject',
+        url: pauta.imagem.url,
+        width: 1600,
+        height: 900,
+      },
+    ],
     datePublished: pauta.dataISO,
     dateModified: pauta.dataISO,
     inLanguage: 'pt-BR',
     articleSection: pauta.trilhaLabel,
     keywords: pauta.tags.join(', '),
     author: {
-      '@type': 'Organization',
+      '@type': 'Person',
       name: pauta.autor.nome,
-      url: 'https://olhapauta.com.br',
+      jobTitle: pauta.autor.cargo,
+      url: 'https://olhapauta.com.br/sobre',
     },
     publisher: {
       '@type': 'Organization',
@@ -403,7 +419,7 @@ const jsonLd = {
       <!-- Author Credit (E-E-A-T) -->
       <div class="mt-8 flex items-center gap-3 border-t border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pt-6">
         <div class="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-xs font-semibold text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]">
-          OP
+          {authorInitials}
         </div>
         <div>
           <p class="text-sm font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">

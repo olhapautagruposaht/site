@@ -15,20 +15,25 @@ export const GET: APIRoute = async () => {
     .map((p) => {
       const url = `https://olhapauta.com.br/pauta/${p.slug}`;
       const pubDate = new Date(p.dataISO).toUTCString();
+      const imgUrl = escapeXml(p.imagem.url);
       return `    <item>
       <title>${escapeXml(p.titulo)}</title>
       <link>${url}</link>
       <guid isPermaLink="true">${url}</guid>
       <description>${escapeXml(p.subtitulo)}</description>
+      <dc:creator>${escapeXml(p.autor.nome)}</dc:creator>
       <category>${escapeXml(p.trilhaLabel)}</category>
       <pubDate>${pubDate}</pubDate>
-      <enclosure url="${escapeXml(p.imagem.url)}" type="image/jpeg" length="0" />
+      <enclosure url="${imgUrl}" type="image/jpeg" length="0" />
+      <media:content url="${imgUrl}" medium="image" width="1600" height="900">
+        <media:title>${escapeXml(p.imagem.alt)}</media:title>
+      </media:content>
     </item>`;
     })
     .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>OlhaPauta</title>
     <link>https://olhapauta.com.br</link>
