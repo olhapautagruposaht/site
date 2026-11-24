@@ -213,7 +213,7 @@ const homeJsonLd = {
         </h2>
 
         <!-- Filter Pills -->
-        <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar pautas por trilha">
+        <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar pautas por tema">
           <button
             type="button"
             data-filter="all"
@@ -224,7 +224,7 @@ const homeJsonLd = {
           {TRILHAS.map((trilha) => (
             <button
               type="button"
-              id={`trilha-${trilha.slug}`}
+              id={`pautas-${trilha.slug}`}
               data-filter={trilha.slug}
               class="filter-btn rounded-full px-3.5 py-1.5 text-xs font-medium border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors cursor-pointer"
             >

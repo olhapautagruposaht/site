@@ -175,10 +175,10 @@ const searchIndex = PAUTAS.map((p) => ({
 
         <!-- Right: Subtle links + Soft Search Pill + Minimal Theme Toggle -->
         <div class="flex items-center gap-5 sm:gap-6">
-          <nav class="hidden md:flex items-center gap-6" aria-label="Trilhas de conteúdo">
+          <nav class="hidden md:flex items-center gap-6" aria-label="Pautas por editoria">
             {TRILHAS.map((trilha) => (
               <a
-                href={`/trilha/${trilha.slug}`}
+                href={`/pautas/${trilha.slug}`}
                 data-astro-prefetch="viewport"
                 class="text-[12px] font-normal text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors"
               >
@@ -277,13 +277,13 @@ const searchIndex = PAUTAS.map((p) => ({
           <div class="grid grid-cols-2 gap-8 md:col-span-6">
             <div>
               <p class="text-[12px] font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-                Trilhas
+                Pautas
               </p>
               <ul class="mt-3 space-y-2 text-[13px]">
                 {TRILHAS.map((trilha) => (
                   <li>
                     <a
-                      href={`/trilha/${trilha.slug}`}
+                      href={`/pautas/${trilha.slug}`}
                       data-astro-prefetch="viewport"
                       class="text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:text-[var(--color-ink)] dark:hover:text-[var(--color-dark-ink)] transition-colors"
                     >

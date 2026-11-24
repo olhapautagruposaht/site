@@ -9,8 +9,8 @@ export const GET: APIRoute = async () => {
     '',
     '> Publicação editorial brasileira especializada em Inteligência Artificial, Tecnologia, Segurança, Negócios e Guias práticos.',
     '',
-    '## Trilhas Editoriais',
-    ...TRILHAS.map((t) => `- **${t.nome}** (https://olhapauta.com.br/trilha/${t.slug}): ${t.descricao}`),
+    '## Pautas por Editoria',
+    ...TRILHAS.map((t) => `- **${t.nome}** (https://olhapauta.com.br/pautas/${t.slug}): ${t.descricao}`),
     '',
     '## Pautas Recentes',
     ...pautas.map(

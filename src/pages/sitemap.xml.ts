@@ -9,7 +9,7 @@ export const GET: APIRoute = async () => {
   const staticUrls = [
     { loc: `${base}/`, priority: '1.0', changefreq: 'daily' },
     ...TRILHAS.map((t) => ({
-      loc: `${base}/trilha/${t.slug}`,
+      loc: `${base}/pautas/${t.slug}`,
       priority: '0.8',
       changefreq: 'daily',
     })),
