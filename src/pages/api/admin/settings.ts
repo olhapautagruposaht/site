@@ -81,23 +81,37 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const body = await request.json();
     const { data: existing } = await client
       .from('admin_settings')
-      .select('ai_api_key, search_api_key, image_api_key')
+      .select('ai_provider, ai_api_key, provider_keys, search_api_key, image_api_key')
       .eq('id', 'default')
       .maybeSingle();
 
-    const apiKey = body.ai_api_key?.trim() || existing?.ai_api_key || null;
+    const provider = (body.ai_provider || 'gemini') as AiProvider;
+    const vault: Record<string, string> = {
+      ...((existing?.provider_keys as Record<string, string> | null) || {}),
+    };
+    if (existing?.ai_provider && existing?.ai_api_key && !vault[existing.ai_provider]) {
+      vault[existing.ai_provider] = existing.ai_api_key;
+    }
+
+    const typedKey = body.ai_api_key?.trim();
+    if (typedKey) {
+      vault[provider] = typedKey;
+    }
+
+    const activeApiKey = vault[provider] || (provider === 'opencode' ? 'public' : null);
     const searchApiKey = body.search_api_key?.trim() || existing?.search_api_key || null;
     const imageApiKey = body.image_api_key?.trim() || existing?.image_api_key || null;
 
     const { error: dbErr } = await client.from('admin_settings').upsert({
       id: 'default',
-      ai_provider: (body.ai_provider || 'openai') as AiProvider,
-      ai_model: (body.ai_model || 'gpt-4o-mini').trim(),
-      ai_api_key: apiKey,
+      ai_provider: provider,
+      ai_model: (body.ai_model || 'gemini-3.8-flash').trim(),
+      ai_api_key: activeApiKey,
+      provider_keys: vault,
       ai_base_url: body.ai_base_url?.trim() || null,
       search_api_key: searchApiKey,
-      image_provider: body.image_provider || 'auto',
-      image_model: (body.image_model || 'imagen-3.0-generate-002').trim(),
+      image_provider: body.image_provider || 'cloudflare',
+      image_model: (body.image_model || '@cf/black-forest-labs/flux-1-schnell').trim(),
       image_api_key: imageApiKey,
     });
 
@@ -108,8 +122,17 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       });
     }
 
+    const maskedVault = Object.fromEntries(
+      Object.entries(vault).map(([k, v]) => [k, maskKey(v)])
+    );
+
     return new Response(
-      JSON.stringify({ ok: true, masked_api_key: maskKey(apiKey), has_api_key: Boolean(apiKey) }),
+      JSON.stringify({
+        ok: true,
+        masked_api_key: maskKey(activeApiKey),
+        has_api_key: Boolean(activeApiKey),
+        masked_provider_keys: maskedVault,
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
     );
   } catch (err) {
@@ -132,19 +155,28 @@ export const PUT: APIRoute = async ({ request, cookies, locals }) => {
   const { client } = getServiceSupabase(locals);
   try {
     const body = await request.json();
+    const provider = (body.ai_provider || 'gemini') as AiProvider;
     let apiKey = body.ai_api_key?.trim();
     if (!apiKey && client) {
       const { data: existing } = await client
         .from('admin_settings')
-        .select('ai_api_key')
+        .select('ai_provider, ai_api_key, provider_keys')
         .eq('id', 'default')
         .maybeSingle();
-      apiKey = existing?.ai_api_key || '';
+      const vault = (existing?.provider_keys as Record<string, string> | null) || {};
+      if (vault[provider]?.trim()) {
+        apiKey = vault[provider].trim();
+      } else if (existing?.ai_provider === provider && existing?.ai_api_key) {
+        apiKey = existing.ai_api_key;
+      }
+    }
+    if (!apiKey && provider === 'opencode') {
+      apiKey = 'public';
     }
 
     const settings: AiSettings = {
-      ai_provider: body.ai_provider || 'openai',
-      ai_model: body.ai_model || 'gpt-4o-mini',
+      ai_provider: provider,
+      ai_model: body.ai_model || 'gemini-3.8-flash',
       ai_api_key: apiKey || '',
       ai_base_url: body.ai_base_url?.trim() || null,
     };

@@ -24,15 +24,20 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     if (!apiKey && client) {
       const { data } = await client
         .from('admin_settings')
-        .select('ai_api_key')
+        .select('ai_provider, ai_api_key, provider_keys')
         .eq('id', 'default')
         .maybeSingle();
-      apiKey = data?.ai_api_key || '';
+      const vault = (data?.provider_keys as Record<string, string> | null) || {};
+      if (vault[provider]?.trim()) {
+        apiKey = vault[provider].trim();
+      } else if (data?.ai_provider === provider && data?.ai_api_key) {
+        apiKey = data.ai_api_key;
+      }
     }
 
-    if (!apiKey) {
+    if (!apiKey && provider !== 'opencode') {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Cole ou salve uma API Key primeiro para listar os modelos.' }),
+        JSON.stringify({ ok: false, error: `Cole ou salve uma API Key de "${provider}" primeiro para listar os modelos.` }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
       );
     }
@@ -69,11 +74,14 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         openai: 'https://api.openai.com/v1/models',
         grok: 'https://api.x.ai/v1/models',
         openrouter: 'https://openrouter.ai/api/v1/models',
+        opencode: 'https://opencode.ai/zen/v1/models',
         custom: `${baseUrl.replace(/\/+$/, '')}/models`,
       };
       const url = endpoints[provider];
       if (!url || url === '/models') throw new Error('Informe a Base URL para listar modelos.');
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey || 'public'}` },
+      });
       if (!res.ok) throw new Error(`${provider} HTTP ${res.status}`);
       const data = (await res.json()) as { data?: { id?: string }[] };
       models = (data.data || []).map((m) => m.id || '').filter(Boolean).slice(0, 60);

@@ -25,15 +25,24 @@ let current = {
   masked_image_key: '',
 };
 
+let maskedProviderKeys: Record<string, string> = {};
+
 if (client) {
   const { data } = await client.from('admin_settings').select('*').eq('id', 'default').maybeSingle();
   if (data) {
+    const vault = (data.provider_keys as Record<string, string> | null) || {};
+    if (data.ai_provider && data.ai_api_key && !vault[data.ai_provider]) {
+      vault[data.ai_provider] = data.ai_api_key;
+    }
+    maskedProviderKeys = Object.fromEntries(
+      Object.entries(vault).filter(([, v]) => Boolean(v)).map(([k, v]) => [k, mask(v)])
+    );
     current = {
       ai_provider: data.ai_provider || 'gemini',
       ai_model: data.ai_model || 'gemini-3.8-flash',
       ai_base_url: data.ai_base_url || '',
-      has_api_key: Boolean(data.ai_api_key),
-      masked_api_key: mask(data.ai_api_key),
+      has_api_key: Boolean(vault[data.ai_provider || 'gemini'] || data.ai_api_key),
+      masked_api_key: mask(vault[data.ai_provider || 'gemini'] || data.ai_api_key),
       has_search_key: Boolean(data.search_api_key),
       masked_search_key: mask(data.search_api_key),
       image_provider: data.image_provider || 'cloudflare',
@@ -69,10 +78,11 @@ if (client) {
             class="mt-1.5 w-full rounded-xl border border-black/15 bg-[#F5F5F7] px-4 py-2.5 text-sm focus:border-black focus:bg-white focus:outline-none"
           >
             <option value="gemini" selected={current.ai_provider === 'gemini'}>Google Gemini (inclui Busca Google nativa)</option>
+            <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos numa única chave)</option>
+            <option value="opencode" selected={current.ai_provider === 'opencode'}>OpenCode Zen (modelos grátis e frontier)</option>
             <option value="openai" selected={current.ai_provider === 'openai'}>OpenAI (GPT-6.2 / GPT-6.1)</option>
             <option value="anthropic" selected={current.ai_provider === 'anthropic'}>Anthropic Claude (Sonnet 5.5 / Opus 5.5 / Fable 5.2)</option>
             <option value="grok" selected={current.ai_provider === 'grok'}>xAI Grok (Grok 4.7)</option>
-            <option value="openrouter" selected={current.ai_provider === 'openrouter'}>OpenRouter (Todos os modelos)</option>
             <option value="custom" selected={current.ai_provider === 'custom'}>Endpoint Custom OpenAI-compatible (Hermes / Ollama / LiteLLM)</option>
           </select>
         </div>
@@ -204,7 +214,7 @@ if (client) {
     </form>
   </div>
 
-  <script define:vars={{ initialModel: current.ai_model, initialImageModel: current.image_model, hasSavedKey: current.has_api_key }}>
+  <script define:vars={{ initialModel: current.ai_model, initialImageModel: current.image_model, maskedProviderKeys }}>
     const providerEl = document.getElementById('ai_provider');
     const modelEl = document.getElementById('ai_model');
     const modelStatusEl = document.getElementById('model-list-status');
@@ -215,13 +225,27 @@ if (client) {
     const apiKeyEl = document.getElementById('ai_api_key');
     const fb = document.getElementById('settings-feedback');
 
+    let savedKeysMap = { ...(maskedProviderKeys || {}) };
+
     const FALLBACK_TEXT_MODELS = {
       gemini: ['gemini-3.8-flash', 'gemini-4-neon', 'gemini-4-carbon', 'gemini-3.5-flash-lite'],
+      openrouter: ['google/gemini-3.8-flash', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
+      opencode: ['big-pickle', 'minimax-m2.5-free', 'glm-5-free'],
       openai: ['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-terra'],
       anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2', 'claude-haiku-5-5'],
       grok: ['grok-4.7', 'grok-4.20'],
-      openrouter: ['google/gemini-3.8-flash', 'anthropic/claude-sonnet-5-5', 'openai/gpt-6.2-sol', 'x-ai/grok-4.7'],
       custom: ['gemini-3.8-flash', 'gpt-6.2-sol'],
+    };
+
+    const syncKeyPlaceholder = () => {
+      const p = providerEl.value;
+      if (savedKeysMap[p]) {
+        apiKeyEl.placeholder = `Chave salva para ${p}: ${savedKeysMap[p]} (deixe vazio para manter)`;
+      } else if (p === 'opencode') {
+        apiKeyEl.placeholder = 'Opcional para modelos grátis do OpenCode Zen (ou cole sua chave Zen)';
+      } else {
+        apiKeyEl.placeholder = `Cole sua API Key de ${p} (suas outras chaves continuam salvas!)`;
+      }
     };
 
     const IMAGE_MODELS = {
@@ -310,9 +334,12 @@ if (client) {
     providerEl.addEventListener('change', () => {
       const p = providerEl.value;
       baseUrlWrap.classList.toggle('hidden', p !== 'custom');
+      apiKeyEl.value = '';
+      syncKeyPlaceholder();
       const fallback = FALLBACK_TEXT_MODELS[p] || FALLBACK_TEXT_MODELS.gemini;
       populateSelect(modelEl, fallback, fallback[0]);
-      if (apiKeyEl.value.trim() || hasSavedKey) loadLiveModels(true);
+      if (savedKeysMap[p] || p === 'opencode') loadLiveModels(true);
+      else modelStatusEl.textContent = `Cole a API Key de ${p} para carregar os modelos disponíveis na sua conta.`;
     });
 
     apiKeyEl.addEventListener('change', () => {
@@ -332,8 +359,10 @@ if (client) {
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        showMsg(true, 'Configurações salvas! Tudo pronto para gerar pautas e capas no Editor.');
+        if (data.masked_provider_keys) savedKeysMap = data.masked_provider_keys;
+        showMsg(true, 'Configurações salvas! Todas as suas chaves por provedor continuam guardadas no cofre.');
         apiKeyEl.value = '';
+        syncKeyPlaceholder();
         document.getElementById('search_api_key').value = '';
         document.getElementById('image_api_key').value = '';
       } else {
@@ -367,8 +396,9 @@ if (client) {
     });
 
     // Initial hydration
+    syncKeyPlaceholder();
     populateSelect(modelEl, FALLBACK_TEXT_MODELS[providerEl.value] || FALLBACK_TEXT_MODELS.gemini, initialModel);
     populateImageModels(initialImageModel);
-    if (hasSavedKey) loadLiveModels(true);
+    if (savedKeysMap[providerEl.value] || providerEl.value === 'opencode') loadLiveModels(true);
   </script>
 </AdminLayout>

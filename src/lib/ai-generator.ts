@@ -2,13 +2,14 @@ import { env as cfEnv } from 'cloudflare:workers';
 import type { PautaPayload } from './editorial-validator';
 import type { TrilhaSlug } from '../data/pautas';
 
-export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'openrouter' | 'custom';
+export type AiProvider = 'openai' | 'gemini' | 'anthropic' | 'grok' | 'openrouter' | 'opencode' | 'custom';
 export type ImageProvider = 'auto' | 'cloudflare' | 'huggingface' | 'fal' | 'gemini' | 'openai';
 
 export interface AiSettings {
   ai_provider: AiProvider;
   ai_model: string;
   ai_api_key: string;
+  provider_keys?: Record<string, string> | null;
   ai_base_url?: string | null;
   search_api_key?: string | null;
   image_provider?: ImageProvider | null;
@@ -16,11 +17,27 @@ export interface AiSettings {
   image_api_key?: string | null;
 }
 
+export function resolveProviderApiKey(
+  settings: Partial<AiSettings> | null | undefined,
+  provider?: string
+): string {
+  const p = provider || settings?.ai_provider || 'gemini';
+  const vault = settings?.provider_keys || {};
+  if (typeof vault[p] === 'string' && vault[p].trim()) {
+    return vault[p].trim();
+  }
+  if (settings?.ai_provider === p && settings?.ai_api_key?.trim()) {
+    return settings.ai_api_key.trim();
+  }
+  return '';
+}
+
 const PROVIDER_ENDPOINTS: Record<Exclude<AiProvider, 'custom' | 'anthropic'>, string> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
   grok: 'https://api.x.ai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+  opencode: 'https://opencode.ai/zen/v1/chat/completions',
 };
 
 const SYSTEM_PROMPT = `Você é o editor-chefe do OlhaPauta (olhapauta.com.br), publicação editorial brasileira de alto padrão sobre Inteligência Artificial, Tecnologia, Segurança, Negócios e Guias práticos.
