@@ -133,7 +133,9 @@ async function fetchReferenceSnippets(urls: string[]): Promise<string> {
 
 async function searchWithTavily(
   apiKey: string,
-  query: string
+  query: string,
+  maxResults = 5,
+  snippetChars = 800
 ): Promise<{ context: string; urls: string[] }> {
   try {
     const res = await fetch('https://api.tavily.com/search', {
@@ -144,7 +146,7 @@ async function searchWithTavily(
         api_key: apiKey,
         query,
         search_depth: 'basic',
-        max_results: 5,
+        max_results: maxResults,
         include_answer: true,
       }),
     });
@@ -155,9 +157,9 @@ async function searchWithTavily(
     };
     const urls = (data.results || []).map((r) => r.url).filter((u): u is string => Boolean(u));
     const lines = [
-      data.answer ? `RESUMO DA PESQUISA WEB: ${data.answer}` : '',
+      data.answer ? `RESUMO: ${data.answer.slice(0, 400)}` : '',
       ...(data.results || []).map(
-        (r, i) => `[${i + 1}] ${r.title || ''} (${r.url || ''})\n${(r.content || '').slice(0, 800)}`
+        (r, i) => `[${i + 1}] ${r.title || ''} (${r.url || ''})\n${(r.content || '').slice(0, snippetChars)}`
       ),
     ].filter(Boolean);
     return { context: lines.join('\n\n'), urls };
@@ -220,13 +222,15 @@ async function callProvider(
   userPrompt: string,
   maxTokens = 4500,
   signal?: AbortSignal,
-  jsonMode = false
+  jsonMode = false,
+  customSystemPrompt?: string
 ): Promise<string> {
   if (!settings.ai_api_key) {
     throw new Error('Chave de API não configurada em Minha IA (API).');
   }
 
   const reqSignal = signal || AbortSignal.timeout(90000);
+  const sysPrompt = customSystemPrompt || SYSTEM_PROMPT;
 
   if (settings.ai_provider === 'anthropic') {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -240,7 +244,7 @@ async function callProvider(
       body: JSON.stringify({
         model: settings.ai_model || 'claude-sonnet-5-5',
         max_tokens: maxTokens,
-        system: SYSTEM_PROMPT,
+        system: sysPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
     });
@@ -281,7 +285,7 @@ async function callProvider(
     temperature: 0.7,
     max_tokens: maxTokens,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: sysPrompt },
       { role: 'user', content: userPrompt },
     ],
   };
@@ -322,15 +326,23 @@ function extractJsonObject(raw: string): string {
 }
 
 function parseAiJson<T>(raw: string): T {
+  if (!raw || !raw.trim()) {
+    throw new Error('O modelo retornou uma resposta vazia. Tente clicar novamente ou trocar de modelo em Minha IA.');
+  }
   const cleaned = extractJsonObject(raw)
     .replace(/[—–]/g, ', ')
     .replace(/,\s*([}\]])/g, '$1');
   try {
     return JSON.parse(cleaned) as T;
   } catch {
-    // Fallback: sanitize unescaped control characters inside strings
-    const sanitized = cleaned.replace(/[\u0000-\u001F]+/g, ' ');
-    return JSON.parse(sanitized) as T;
+    try {
+      const sanitized = cleaned.replace(/[\u0000-\u001F]+/g, ' ');
+      return JSON.parse(sanitized) as T;
+    } catch (e) {
+      throw new Error(
+        `O modelo não retornou JSON completo (${e instanceof Error ? e.message : 'erro de sintaxe'}). Tente novamente.`
+      );
+    }
   }
 }
 
@@ -408,19 +420,25 @@ export async function discoverTrendingTopics(
   let tavilyContext = '';
   let webSearchUsed = 'none';
   if (settings.search_api_key && settings.ai_provider !== 'gemini') {
-    // 3 parallel broad-appeal searches so the 5 cards cover high-volume Discover + high-RPM Search
+    // 3 parallel compact broad-appeal searches so the 5 cards cover high-volume Discover + high-RPM Search
     const [q1, q2, q3] = await Promise.all([
       searchWithTavily(
         settings.search_api_key,
-        `novidades inteligência artificial ChatGPT Gemini Claude OpenAI Apple Google hoje ${today} Brasil`
+        `novidades inteligência artificial ChatGPT Gemini Claude OpenAI Apple Google ${today} Brasil`,
+        3,
+        320
       ),
       searchWithTavily(
         settings.search_api_key,
-        `WhatsApp Android iPhone golpe IA deepfake celular Brasil novidade ${today}`
+        `WhatsApp Android iPhone golpe IA deepfake celular Brasil novidade ${today}`,
+        3,
+        320
       ),
       searchWithTavily(
         settings.search_api_key,
-        `ferramentas IA gratuitas produtividade trabalho negócios tecnologia Brasil ${today}`
+        `ferramentas IA gratuitas produtividade trabalho negócios tecnologia Brasil ${today}`,
+        3,
+        320
       ),
     ]);
     tavilyContext = [q1.context, q2.context, q3.context].filter(Boolean).join('\n\n---\n\n');
@@ -452,13 +470,16 @@ RETORNE APENAS UM JSON VÁLIDO (sem markdown) neste formato exato:
 
   let raw = '';
   let groundingUrls: string[] = [];
+  const discoverSysPrompt =
+    'Você é o editor de Google Discover do OlhaPauta (pt-BR). Retorne APENAS um objeto JSON válido com a chave "suggestions" contendo 5 objetos. Proibido markdown, proibido travessão (— ou –).';
+
   if (settings.ai_provider === 'gemini') {
     const gem = await callGeminiWithSearch(settings, prompt, 3500);
     raw = gem.text;
     groundingUrls = gem.groundingUrls;
     webSearchUsed = 'gemini-google-search';
   } else {
-    raw = await callProvider(settings, prompt, 3500, undefined, true);
+    raw = await callProvider(settings, prompt, 3500, undefined, true, discoverSysPrompt);
   }
 
   const parsed = parseAiJson<{ suggestions?: TrendingSuggestion[] }>(raw);
