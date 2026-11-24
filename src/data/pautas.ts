@@ -73,289 +73,100 @@ export const TRILHAS: { slug: TrilhaSlug; nome: string; descricao: string }[] = 
 
 export const PAUTAS: Pauta[] = [
   {
-    numero: '042',
-    slug: 'era-dos-agentes-autonomos-como-mcp-mudou-a-arquitetura-da-ia',
+    numero: '001',
+    slug: 'virada-silenciosa-da-ia-por-que-prompts-longos-perdem-espaco-para-agentes-autonomos',
     trilha: 'ia',
     trilhaLabel: 'IA',
-    titulo: 'A era silenciosa dos agentes: por que o protocolo MCP está redefinindo o software moderno',
+    titulo: 'A virada silenciosa da IA no trabalho: por que prompts longos estão perdendo espaço para agentes autônomos',
     subtitulo:
-      'Modelos de linguagem deixaram de ser caixas de texto isoladas. Com conectores padronizados, a IA passou a operar ferramentas reais, mudando a forma como empresas constroem produtos.',
+      'Durante dois anos, dominar inteligência artificial significava escrever comandos perfeitos em uma caixa de texto. Agora, quem ganha tempo de verdade está configurando agentes que pesquisam, conferem dados e executam etapas inteiras sozinhos.',
     resumoCurto:
-      'Como o Model Context Protocol (MCP) substituiu integrações frágeis por um padrão aberto que conecta modelos a bancos de dados, repositórios e operações reais.',
+      'Entenda por que a forma de usar IA mudou da conversa manual no chat para agentes conectados a ferramentas reais, e o que muda na prática para profissionais e empresas.',
     tldr: [
-      'A grande virada de 2026 não é apenas modelos maiores, mas a padronização de como eles acessam ferramentas externas.',
-      'O protocolo MCP reduz drasticamente o custo de integrar IA a bancos de dados, CRMs e fluxos internos.',
-      'Empresas de software estão redesenhando suas interfaces para serem operadas tanto por humanos quanto por agentes.',
+      'A vantagem competitiva deixou de ser escrever prompts gigantes e passou a ser conectar modelos de IA às ferramentas que você já usa todos os dias.',
+      'Agentes autônomos conseguem planejar etapas, consultar arquivos, cruzar fontes e entregar o rascunho pronto apenas para revisão humana.',
+      'Quem continua usando IA só como caixa de perguntas e respostas aproveita menos de um terço do ganho real de produtividade disponível hoje.',
     ],
     dataPublicacao: '23 NOV 2026',
     dataISO: '2026-11-23T09:00:00-03:00',
-    tempoLeitura: '5 MIN',
+    tempoLeitura: '6 MIN',
     autor: {
       nome: 'Redação OlhaPauta',
       cargo: 'Mesa Editorial de IA',
     },
     imagem: {
       url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Representação minimalista de arquitetura de agentes de inteligência artificial',
+      alt: 'Representação visual minimalista de inteligência artificial e sistemas autônomos modernos',
       credito: 'Foto: Unsplash / Editorial OlhaPauta',
     },
-    tags: ['MCP', 'AGENTES', 'ARQUITETURA'],
+    tags: ['IA', 'AGENTES', 'PRODUTIVIDADE', 'MCP'],
     destaque: true,
     conteudo: [
       {
         paragraphs: [
-          'Durante os primeiros anos da corrida pela inteligência artificial generativa, a atenção ficou concentrada quase exclusivamente na capacidade bruta dos modelos. Cada lançamento era medido por tabelas de benchmark, velocidade de tokens e tamanho da janela de contexto.',
-          'Em 2026, o centro de gravidade mudou. O gargalo deixou de ser o quão inteligente um modelo é em uma conversa isolada, e passou a ser o quão confiável ele consegue ser ao agir dentro dos sistemas reais de uma empresa.',
+          'Se você ainda abre uma aba de chat, cola três parágrafos de contexto, corrige a resposta duas vezes e depois copia o texto de volta para a sua planilha ou e-mail, existe uma chance grande de estar usando a inteligência artificial no modo manual. Até pouco tempo atrás, esse era o único jeito possível. Hoje, ele já começa a parecer lento.',
+          'Nos últimos meses, uma mudança silenciosa alterou a rotina de equipes de tecnologia, marketing, finanças e redação. Em vez de tratar a IA como um oráculo preso dentro de uma janela de conversa, profissionais passaram a operar com agentes: sistemas capazes de receber um objetivo, quebrar o trabalho em passos menores, consultar fontes externas e executar ações concretas dentro de aplicativos reais.',
         ],
       },
       {
-        heading: 'Do chatbot isolado ao operador de sistemas',
+        heading: 'O limite invisível da engenharia de prompt',
         paragraphs: [
-          'Antes de existir um padrão amplamente adotado, cada equipe precisava escrever conectores sob medida para ligar um modelo ao seu banco de dados, ao e-mail ou ao painel de publicação. Era um trabalho repetitivo, frágil e difícil de auditar.',
-          'Com o amadurecimento do Model Context Protocol (MCP), essa camada passou a funcionar como uma porta USB-C para inteligência artificial: você expõe ferramentas, permissões e contextos em um formato único, e qualquer agente compatível consegue operá-las com segurança.',
+          'Quando os primeiros modelos generativos se popularizaram, surgiu uma corrida por "prompts mágicos". Manuais inteiros prometiam resultados superiores se o usuário escrevesse instruções no formato exato. Isso ajudou no início, mas logo esbarrou em um gargalo óbvio: o ser humano continuava sendo a ponte manual entre todas as ferramentas.',
+          'Você pesquisava um dado em um site, colava no chat, pedia um resumo, levava o resumo para um documento, conferia um número no banco de dados e voltava para ajustar o texto. A IA acelerava a escrita, mas o trabalho operacional de juntar as peças continuava inteiro nas suas costas.',
         ],
         quote:
-          'O software mais valioso dos próximos anos não será apenas bonito para humanos clicarem. Ele será estruturado para agentes operarem sem atrito.',
+          'O verdadeiro salto de produtividade não acontece quando a IA escreve mais rápido, mas quando ela deixa de depender de você copiar e colar contexto o dia inteiro.',
       },
       {
-        heading: 'O que muda na prática para quem constrói hoje',
+        heading: 'O que um agente de IA faz de diferente na prática',
         paragraphs: [
-          'Na prática, pequenas equipes conseguem montar operações que antes exigiam dezenas de integrações manuais. Um fluxo editorial, por exemplo, pode pesquisar fontes, cruzar dados em um banco relacional, estruturar rascunhos e aguardar aprovação humana em um único ciclo.',
+          'A diferença entre um chatbot tradicional e um agente é simples de visualizar. Um chatbot responde uma pergunta com base no que você colou na tela. Um agente recebe uma missão, decide quais ferramentas precisa consultar, verifica se faltou alguma informação e só devolve o resultado quando a entrega está montada.',
+          'Em vez de pedir "escreva uma análise sobre as despesas deste mês" e colar manualmente dez tabelas, você autoriza o agente a ler a pasta de relatórios, cruzar os números com o mês anterior, destacar anomalias e preparar o documento final para sua aprovação. O foco humano sai da digitação repetitiva e vai direto para a decisão.',
         ],
         callout: {
-          label: 'NOTA TÉCNICA · ARQUITETURA',
-          text: 'Sistemas baseados em MCP separam claramente o raciocínio (modelo) da execução (ferramentas). Isso permite trocar o modelo de IA sem precisar reescrever nenhuma integração de negócio.',
+          label: 'CONTEXTO TÉCNICO',
+          text: 'Padrões abertos de conexão, como o Model Context Protocol (MCP), aceleraram essa virada ao funcionar como um adaptador universal: qualquer agente compatível consegue ler bancos de dados, repositórios e documentos com permissões controladas, sem precisar de integrações sob medida para cada ferramenta.',
         },
+      },
+      {
+        heading: 'Onde os agentes já funcionam bem e onde ainda exigem cuidado',
+        paragraphs: [
+          'Nem toda tarefa deve ser entregue no piloto automático. A experiência das equipes que adotaram agentes em produção mostra uma divisão muito clara entre o que já gera ganho imediato e o que ainda precisa de supervisão próxima.',
+        ],
         bullets: [
-          'Permissões granulares: o agente só enxerga exatamente o que foi autorizado.',
-          'Independência de fornecedor: menos dependência de um único laboratório de IA.',
-          'Auditoria simples: cada chamada de ferramenta deixa um rastro claro e verificável.',
+          'Pesquisa e triagem de informações: monitorar fontes confiáveis, resumir documentos longos e organizar pautas ou relatórios diários já funciona com altíssima precisão.',
+          'Operações repetitivas entre sistemas: atualizar registros, classificar solicitações, gerar rascunhos padronizados e conferir dados estruturados economiza horas por semana.',
+          'Decisões sensíveis e publicação final: aprovações financeiras, respostas jurídicas, posicionamento de marca e publicação editorial continuam exigindo revisão humana antes do envio.',
         ],
       },
       {
-        heading: 'O novo papel da curadoria humana',
+        heading: 'Como começar sem complicar a sua rotina',
         paragraphs: [
-          'Quanto mais rápida fica a execução automatizada, mais valioso se torna o critério editorial e estratégico. A vantagem competitiva deixou de ser produzir volume, e passou a ser decidir o que merece atenção, clareza e profundidade.',
+          'Você não precisa montar uma infraestrutura complexa para sair do modo manual. O caminho mais seguro é escolher uma única tarefa repetitiva que hoje consome 30 minutos do seu dia, mapear quais dados ela usa e testar um fluxo assistido em que a IA prepara 80% do trabalho e você faz a validação final.',
+          'A mudança mais importante não é técnica, é de hábito. Quem aprende a delegar etapas claras, definir critérios de qualidade e revisar entregas com senso crítico transforma a inteligência artificial de um simples chat em uma camada real de execução no trabalho.',
         ],
       },
     ],
     faqs: [
       {
-        pergunta: 'O que é o protocolo MCP na inteligência artificial?',
+        pergunta: 'Qual é a diferença entre um chatbot de IA e um agente autônomo?',
         resposta:
-          'O Model Context Protocol (MCP) é um padrão aberto que padroniza como modelos de IA e agentes se conectam a bancos de dados, APIs e ferramentas externas, eliminando integrações sob medida para cada modelo.',
+          'Um chatbot tradicional apenas responde às mensagens dentro de uma conversa. Já um agente autônomo consegue dividir um objetivo em etapas, acessar ferramentas externas autorizadas, buscar dados atualizados e entregar uma tarefa estruturada para revisão.',
       },
       {
-        pergunta: 'Preciso trocar meu banco de dados ou stack atual para usar MCP?',
+        pergunta: 'Preciso saber programar para usar agentes de IA no trabalho?',
         resposta:
-          'Não. O MCP funciona como uma camada intermediária leve que expõe recursos já existentes (como Postgres, Supabase, GitHub ou CRMs) com permissões controladas para os agentes.',
+          'Não necessariamente. Hoje existem plataformas visuais e assistentes corporativos que permitem conectar documentos, planilhas, calendários e e-mails com poucos cliques, mantendo controle sobre o que o agente pode ler ou alterar.',
       },
       {
-        pergunta: 'O uso de agentes com MCP substitui a revisão humana?',
+        pergunta: 'É seguro deixar um agente de IA acessar dados da empresa?',
         resposta:
-          'Não em operações críticas ou editoriais. A prática mais eficaz em 2026 combina execução e pesquisa automatizadas com aprovação e curadoria humana antes da publicação final.',
-      },
-    ],
-  },
-  {
-    numero: '041',
-    slug: 'modelos-de-raciocinio-profundo-quando-vale-esperar-mais-por-uma-resposta',
-    trilha: 'ia',
-    trilhaLabel: 'IA',
-    titulo: 'Modelos de raciocínio profundo: quando vale pagar mais latência por decisões melhores',
-    subtitulo:
-      'Nem toda tarefa pede pensamento em cadeia prolongado. Entenda como equilibrar velocidade, custo por token e precisão em fluxos reais de produção.',
-    resumoCurto:
-      'Um guia objetivo para escolher entre modelos rápidos e modelos de raciocínio estendido sem desperdiçar orçamento ou travar a experiência do usuário.',
-    tldr: [
-      'Modelos de raciocínio brilham em arquitetura, debugging complexo e síntese estratégica, e não em tarefas simples de classificação.',
-      'Roteamento híbrido (modelo rápido na triagem + modelo profundo na análise) reduz custos em até 65%.',
-      'Avaliar resultados em tarefas próprias vale muito mais do que seguir rankings genéricos.',
-    ],
-    dataPublicacao: '21 NOV 2026',
-    dataISO: '2026-11-21T10:30:00-03:00',
-    tempoLeitura: '6 MIN',
-    autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
-    },
-    imagem: {
-      url: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Visual minimalista de circuitos e processamento de dados',
-      credito: 'Foto: Unsplash / Editorial OlhaPauta',
-    },
-    tags: ['BENCHMARKS', 'CUSTO', 'MODELOS'],
-    conteudo: [
-      {
-        paragraphs: [
-          'A promessa dos modelos com tempo de inferência estendido mudou o teto do que a IA consegue resolver sozinha. Problemas de lógica, refatoração de código e análise financeira passaram a ter taxas de acerto inéditas.',
-          'Mas colocar um modelo de raciocínio profundo em todas as pontas de um produto é o equivalente técnico a usar um caminhão para entregar uma carta na esquina: fica caro, lento e desnecessário.',
-        ],
+          'A segurança depende das permissões configuradas. A prática recomendada é conceder acesso apenas de leitura no início, limitar quais pastas ou tabelas o agente enxerga e exigir aprovação humana antes de qualquer ação externa ou publicação.',
       },
       {
-        heading: 'A regra do roteamento em duas camadas',
-        paragraphs: [
-          'As equipes mais eficientes hoje operam com roteamento inteligente. Um modelo ultrarrápido faz a leitura inicial, classifica a complexidade do pedido e resolve diretamente 70% a 80% dos casos.',
-          'Somente quando há ambiguidade, múltiplas restrições ou risco alto de erro é que o pedido sobe para um modelo de raciocínio profundo.',
-        ],
-        callout: {
-          label: 'DADO DE REFERÊNCIA',
-          text: 'Em pipelines editoriais e de engenharia, separar triagem de execução pesada costuma reduzir o custo mensal de API pela metade mantendo a mesma percepção de qualidade.',
-        },
-      },
-    ],
-  },
-  {
-    numero: '040',
-    slug: 'o-fim-do-design-generico-como-publicacoes-de-ia-estao-voltando-ao-editorial-puro',
-    trilha: 'tecnologia',
-    trilhaLabel: 'Tecnologia',
-    titulo: 'O fim do visual genérico: por que publicações de tecnologia estão voltando ao editorial puro',
-    subtitulo:
-      'Em um mar de páginas idênticas cheias de banners e gradientes neon, clareza tipográfica e silêncio visual viraram o novo sinal de autoridade.',
-    resumoCurto:
-      'Por que o leitor moderno abandona portais poluídos em segundos e o que as publicações digitais mais admiradas estão fazendo para recuperar atenção real.',
-    tldr: [
-      'A saturação de templates idênticos tornou o minimalismo editorial um diferencial imediato de confiança.',
-      'Leitura em coluna única, contraste limpo e carregamento instantâneo elevam drasticamente o tempo de permanência.',
-      'No Google Discover, páginas limpas e estáveis (Core Web Vitals no verde) superam portais pesados em retenção.',
-    ],
-    dataPublicacao: '19 NOV 2026',
-    dataISO: '2026-11-19T14:00:00-03:00',
-    tempoLeitura: '4 MIN',
-    autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
-    },
-    imagem: {
-      url: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Estética editorial minimalista com papel e escrita',
-      credito: 'Foto: Unsplash / Editorial OlhaPauta',
-    },
-    tags: ['DESIGN', 'DISCOVER', 'EDITORIAL'],
-    conteudo: [
-      {
-        paragraphs: [
-          'Basta abrir cinco portais de tecnologia escolhidos ao acaso para notar o mesmo padrão: caixas competindo por atenção, pop-ups interrompendo o primeiro parágrafo e anúncios que empurram o texto para fora da tela.',
-          'O efeito colateral foi previsível: o leitor passou a associar excesso visual a conteúdo raso. Em resposta, as publicações mais respeitadas voltaram aos fundamentos do papel impresso: margens generosas, tipografia impecável e zero ruído.',
-        ],
-      },
-      {
-        heading: 'Atenção é um ativo de confiança',
-        paragraphs: [
-          'Quando uma página carrega em menos de um segundo e entrega exatamente o que o título prometeu, o leitor relaxa e continua para a próxima pauta. Design premium não é sobre adicionar elementos; é sobre remover tudo o que atrapalha o entendimento.',
-        ],
-      },
-    ],
-  },
-  {
-    numero: '039',
-    slug: 'guia-pratico-como-estruturar-um-fluxo-editorial-assistido-por-ia-sem-perder-a-voz',
-    trilha: 'guias',
-    trilhaLabel: 'Guias',
-    titulo: 'Como estruturar um fluxo editorial assistido por IA sem perder rigor nem voz própria',
-    subtitulo:
-      'Um passo a passo prático para combinar coleta automatizada, verificação de fontes e revisão humana em um sistema leve e escalável.',
-    resumoCurto:
-      'A arquitetura exata de 4 etapas para transformar sinais dispersos da web em conteúdo original, verificável e agradável de ler.',
-    tldr: [
-      'Automação funciona melhor na coleta, organização e checagem estrutural do que na geração sem critério.',
-      'Definir um manual de estilo curto e objetivo evita o tom robótico e repetitivo nos textos.',
-      'Separar rascunho de publicação em um banco estruturado garante controle total sobre o que vai ao ar.',
-    ],
-    dataPublicacao: '17 NOV 2026',
-    dataISO: '2026-11-17T08:15:00-03:00',
-    tempoLeitura: '7 MIN',
-    autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
-    },
-    imagem: {
-      url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Detalhe de hardware e precisão técnica para guia de fluxo editorial',
-      credito: 'Foto: Unsplash / Editorial OlhaPauta',
-    },
-    tags: ['WORKFLOW', 'AUTOMAÇÃO', 'GUIA'],
-    conteudo: [
-      {
-        paragraphs: [
-          'Usar inteligência artificial na produção de conteúdo não significa apertar um botão e publicar qualquer texto. O resultado desse atalho é sempre o mesmo: artigos genéricos que ninguém termina de ler e que os algoritmos rapidamente ignoram.',
-          'O caminho sustentável usa a IA como uma mesa de pesquisa incansável: ela monitora fontes primárias, organiza dados, aponta lacunas e prepara a estrutura, enquanto o critério editorial define o ângulo e a clareza final.',
-        ],
-      },
-    ],
-  },
-  {
-    numero: '038',
-    slug: 'ia-local-em-notebooks-o-que-ja-roda-sem-nuvem-e-onde-ainda-ha-limite',
-    trilha: 'seguranca',
-    trilhaLabel: 'Segurança',
-    titulo: 'IA local no notebook: o que já roda offline com qualidade real e onde ainda há limite',
-    subtitulo:
-      'Modelos compactos evoluíram rápido o bastante para transformar tarefas privadas em processamento 100% local, sem custo por requisição.',
-    resumoCurto:
-      'Testamos o estado atual dos modelos locais para resumo de documentos, código e transcrição, mostrando quando vale abrir mão da nuvem.',
-    tldr: [
-      'Resumo de PDFs, transcrição de áudio e autocompletar de código já rodam com folga em notebooks modernos.',
-      'Privacidade absoluta e custo zero por token tornam a IA local ideal para documentos sensíveis.',
-      'Para raciocínio aberto e pesquisa em larga escala, modelos de fronteira na nuvem ainda lideram com margem.',
-    ],
-    dataPublicacao: '15 NOV 2026',
-    dataISO: '2026-11-15T11:00:00-03:00',
-    tempoLeitura: '5 MIN',
-    autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
-    },
-    imagem: {
-      url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Notebook minimalista estilo Apple sobre mesa limpa',
-      credito: 'Foto: Unsplash / Editorial OlhaPauta',
-    },
-    tags: ['LOCAL AI', 'PRIVACIDADE', 'HARDWARE'],
-    conteudo: [
-      {
-        paragraphs: [
-          'A evolução dos modelos compactos quantizados tornou viável rodar assistentes competentes diretamente no chip do seu computador, sem enviar uma única linha de dados para servidores externos.',
-          'Para quem lida com contratos, notas pessoais ou código proprietário, a combinação de IA local no dia a dia com modelos de nuvem apenas para tarefas pesadas já é o padrão mais inteligente.',
-        ],
-      },
-    ],
-  },
-  {
-    numero: '037',
-    slug: 'como-empresas-brasileiras-estao-medindo-roi-real-em-projetos-de-ia',
-    trilha: 'negocios',
-    trilhaLabel: 'Negócios',
-    titulo: 'Como empresas brasileiras estão medindo ROI real em projetos de IA em 2026',
-    subtitulo:
-      'Passada a fase dos pilotos experimentais, lideranças técnicas agora cobram métricas concretas de tempo economizado, margem e qualidade operacional.',
-    resumoCurto:
-      'Quais indicadores realmente funcionam para separar automações que trazem retorno financeiro de experimentos que só consomem orçamento de API.',
-    tldr: [
-      'Projetos de IA que sobrevivem ao primeiro trimestre têm uma métrica clara de tempo ou custo por tarefa.',
-      'Operações de atendimento, triagem documental e engenharia lideram o retorno mensurável no Brasil.',
-      'Treinamento de equipe e revisão de processos pesam mais no resultado do que a troca constante de modelo.',
-    ],
-    dataPublicacao: '12 NOV 2026',
-    dataISO: '2026-11-12T09:30:00-03:00',
-    tempoLeitura: '6 MIN',
-    autor: {
-      nome: 'Redação OlhaPauta',
-      cargo: 'Mesa Editorial de IA',
-    },
-    imagem: {
-      url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=85',
-      alt: 'Arquitetura corporativa moderna com vidro e linhas limpas',
-      credito: 'Foto: Unsplash / Editorial OlhaPauta',
-    },
-    tags: ['MERCADO', 'ROI', 'ESTRATÉGIA'],
-    conteudo: [
-      {
-        paragraphs: [
-          'Depois de dois anos marcados por demonstrações impressionantes e poucos resultados práticos, o mercado corporativo entrou em uma fase pragmática. A pergunta deixou de ser qual modelo usar e passou a ser qual gargalo real está sendo resolvido.',
-          'Equipes que tratam IA como infraestrutura operacional, medindo tempo de ciclo e taxa de retrabalho antes e depois da implantação, colhem ganhos consistentes sem inflar a conta de nuvem.',
-        ],
+        pergunta: 'Prompts bem escritos deixaram de importar?',
+        resposta:
+          'Não deixaram de importar, mas mudaram de papel. Em vez de escrever prompts gigantes toda vez, você passa a definir regras fixas de contexto, formato e critério de qualidade uma única vez para o agente reutilizar em todas as tarefas.',
       },
     ],
   },
@@ -365,7 +176,8 @@ export function getPautaBySlug(slug: string): Pauta | undefined {
   return PAUTAS.find((p) => p.slug === slug);
 }
 
-export function getNextPauta(currentSlug: string): Pauta {
+export function getNextPauta(currentSlug: string): Pauta | null {
+  if (PAUTAS.length <= 1) return null;
   const index = PAUTAS.findIndex((p) => p.slug === currentSlug);
   const nextIndex = index === -1 ? 0 : (index + 1) % PAUTAS.length;
   return PAUTAS[nextIndex];
@@ -373,5 +185,5 @@ export function getNextPauta(currentSlug: string): Pauta {
 
 export function getRelatedPautas(currentSlug: string, count = 2): Pauta[] {
   const next = getNextPauta(currentSlug);
-  return PAUTAS.filter((p) => p.slug !== currentSlug && p.slug !== next.slug).slice(0, count);
+  return PAUTAS.filter((p) => p.slug !== currentSlug && p.slug !== next?.slug).slice(0, count);
 }

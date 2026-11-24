@@ -12,9 +12,9 @@ if (currentIndex === -1) {
 }
 
 const pauta = allPautas[currentIndex];
-const nextPauta = allPautas[(currentIndex + 1) % allPautas.length];
+const nextPauta = allPautas.length > 1 ? allPautas[(currentIndex + 1) % allPautas.length] : null;
 const relatedPautas = allPautas
-  .filter((p) => p.slug !== pauta.slug && p.slug !== nextPauta.slug)
+  .filter((p) => p.slug !== pauta.slug && p.slug !== nextPauta?.slug)
   .slice(0, 2);
 
 Astro.response.headers.set(
@@ -412,80 +412,86 @@ const jsonLd = {
         </div>
       </div>
 
-      <!-- Primary Next Pauta Card -->
-      <section aria-label="Próxima pauta" class="mt-12">
-        <a
-          href={`/pauta/${nextPauta.slug}`}
-          data-astro-prefetch="viewport"
-          class="group block rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6 sm:p-8 transition-transform duration-200 hover:-translate-y-0.5"
-        >
-          <div class="flex items-center justify-between gap-2 text-xs font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-            <span class="inline-flex items-center gap-2 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] font-semibold">
-              <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
-              Próxima pauta
-            </span>
-            <span>{nextPauta.tempoLeitura.toLowerCase()} de leitura</span>
-          </div>
+      <!-- Primary Next Pauta Card (only when there are 2+ pautas) -->
+      {nextPauta && (
+        <section aria-label="Próxima pauta" class="mt-12">
+          <a
+            href={`/pauta/${nextPauta.slug}`}
+            data-astro-prefetch="viewport"
+            class="group block rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-6 sm:p-8 transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            <div class="flex items-center justify-between gap-2 text-xs font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+              <span class="inline-flex items-center gap-2 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] font-semibold">
+                <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+                Próxima pauta
+              </span>
+              <span>{nextPauta.tempoLeitura.toLowerCase()} de leitura</span>
+            </div>
 
-          <h2 class="mt-3 text-xl sm:text-2xl font-bold leading-snug tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-            {nextPauta.titulo}
-          </h2>
+            <h2 class="mt-3 text-xl sm:text-2xl font-bold leading-snug tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+              {nextPauta.titulo}
+            </h2>
 
-          <p class="mt-2 text-sm sm:text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
-            {nextPauta.resumoCurto}
-          </p>
+            <p class="mt-2 text-sm sm:text-[15px] leading-relaxed text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)]">
+              {nextPauta.resumoCurto}
+            </p>
 
-          <div class="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-            Continuar leitura
-            <span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] transition-transform group-hover:translate-x-1">→</span>
-          </div>
-        </a>
-      </section>
+            <div class="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+              Continuar leitura
+              <span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </a>
+        </section>
+      )}
 
       <!-- Related Pautas -->
-      <section class="mt-8" aria-label="Outras pautas recomendadas">
-        <div class="grid gap-4 sm:grid-cols-2">
-          {relatedPautas.map((rel) => (
-            <a
-              href={`/pauta/${rel.slug}`}
-              class="group rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5 hover:opacity-85 transition-opacity"
-            >
-              <div class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                {rel.trilhaLabel} · {rel.tempoLeitura.toLowerCase()}
-              </div>
-              <h3 class="mt-1.5 text-base font-semibold leading-snug tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-                {rel.titulo}
-              </h3>
-            </a>
-          ))}
-        </div>
-      </section>
+      {relatedPautas.length > 0 && (
+        <section class="mt-8" aria-label="Outras pautas recomendadas">
+          <div class="grid gap-4 sm:grid-cols-2">
+            {relatedPautas.map((rel) => (
+              <a
+                href={`/pauta/${rel.slug}`}
+                class="group rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] p-5 hover:opacity-85 transition-opacity"
+              >
+                <div class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  {rel.trilhaLabel} · {rel.tempoLeitura.toLowerCase()}
+                </div>
+                <h3 class="mt-1.5 text-base font-semibold leading-snug tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                  {rel.titulo}
+                </h3>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   </article>
 
-  <!-- Subtle Floating Next Pauta Pill (appears after 68% scroll) -->
-  <div
-    id="next-pauta-dock"
-    class="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[calc(100%-2rem)] max-w-md"
-  >
-    <a
-      href={`/pauta/${nextPauta.slug}`}
-      data-astro-prefetch="load"
-      class="pointer-events-auto flex items-center justify-between gap-3 rounded-full border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)]/95 dark:bg-[var(--color-dark-surface)]/95 px-4 py-2.5 shadow-lg backdrop-blur-md hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors"
+  <!-- Subtle Floating Next Pauta Pill (only when there are 2+ pautas) -->
+  {nextPauta && (
+    <div
+      id="next-pauta-dock"
+      class="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[calc(100%-2rem)] max-w-md"
     >
-      <div class="min-w-0">
-        <p class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-          Próxima pauta
-        </p>
-        <p class="truncate text-xs font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-          {nextPauta.titulo}
-        </p>
-      </div>
-      <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-xs text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]">
-        →
-      </span>
-    </a>
-  </div>
+      <a
+        href={`/pauta/${nextPauta.slug}`}
+        data-astro-prefetch="load"
+        class="pointer-events-auto flex items-center justify-between gap-3 rounded-full border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] bg-[var(--color-paper)]/95 dark:bg-[var(--color-dark-surface)]/95 px-4 py-2.5 shadow-lg backdrop-blur-md hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors"
+      >
+        <div class="min-w-0">
+          <p class="text-[11px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+            Próxima pauta
+          </p>
+          <p class="truncate text-xs font-medium text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+            {nextPauta.titulo}
+          </p>
+        </div>
+        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] text-xs text-[var(--color-paper)] dark:text-[var(--color-dark-paper)]">
+          →
+        </span>
+      </a>
+    </div>
+  )}
 
   <script is:inline>
     (() => {

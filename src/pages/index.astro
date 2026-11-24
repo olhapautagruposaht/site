@@ -114,174 +114,181 @@ const homeJsonLd = {
         </a>
       </article>
 
-      <!-- Row 2: Two Medium Cards Side-by-Side -->
-      <div class="mt-7 grid gap-7 md:grid-cols-2">
-        {featuredPair.map((pauta) => (
-          <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
-            <a
-              href={`/pauta/${pauta.slug}`}
-              data-astro-prefetch="viewport"
-              class="flex flex-1 flex-col focus:outline-none"
-            >
-              <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
-                <img
-                  src={pauta.imagem.url}
-                  alt={pauta.imagem.alt}
-                  width="1200"
-                  height="675"
-                  loading="lazy"
-                  decoding="async"
-                  class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-                />
-              </div>
-
-              <div class="flex flex-1 flex-col justify-between p-7">
-                <div>
-                  <span class="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
-                    {pauta.trilhaLabel}
-                  </span>
-
-                  <h2 class="mt-2 text-[21px] sm:text-[23px] font-bold leading-[1.2] tracking-[-0.022em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-                    {pauta.titulo}
-                  </h2>
+      <!-- Row 2: Two Medium Cards Side-by-Side (only when there are 2+ pautas) -->
+      {featuredPair.length > 0 && (
+        <div class={`mt-7 grid gap-7 ${featuredPair.length === 1 ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+          {featuredPair.map((pauta) => (
+            <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+              <a
+                href={`/pauta/${pauta.slug}`}
+                data-astro-prefetch="viewport"
+                class="flex flex-1 flex-col focus:outline-none"
+              >
+                <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+                  <img
+                    src={pauta.imagem.url}
+                    alt={pauta.imagem.alt}
+                    width="1200"
+                    height="675"
+                    loading="lazy"
+                    decoding="async"
+                    class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                  />
                 </div>
 
-                <div class="mt-6 flex items-center justify-between text-[13px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                  <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
-                  <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                <div class="flex flex-1 flex-col justify-between p-7">
+                  <div>
+                    <span class="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                      {pauta.trilhaLabel}
+                    </span>
+
+                    <h2 class="mt-2 text-[21px] sm:text-[23px] font-bold leading-[1.2] tracking-[-0.022em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                      {pauta.titulo}
+                    </h2>
+                  </div>
+
+                  <div class="mt-6 flex items-center justify-between text-[13px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                    <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
+                    <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                  </div>
                 </div>
-              </div>
-            </a>
-          </article>
-        ))}
-      </div>
+              </a>
+            </article>
+          ))}
+        </div>
+      )}
 
-      <!-- Row 3: Three Compact Cards -->
-      <div class="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
-        {featuredTrio.map((pauta) => (
-          <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
-            <a
-              href={`/pauta/${pauta.slug}`}
-              data-astro-prefetch="viewport"
-              class="flex flex-1 flex-col focus:outline-none"
-            >
-              <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
-                <img
-                  src={pauta.imagem.url}
-                  alt={pauta.imagem.alt}
-                  width="800"
-                  height="450"
-                  loading="lazy"
-                  decoding="async"
-                  class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-                />
-              </div>
-
-              <div class="flex flex-1 flex-col justify-between p-6">
-                <div>
-                  <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
-                    {pauta.trilhaLabel}
-                  </span>
-
-                  <h2 class="mt-2 text-[18px] font-bold leading-[1.25] tracking-[-0.018em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-                    {pauta.titulo}
-                  </h2>
+      <!-- Row 3: Three Compact Cards (only when there are 4+ pautas) -->
+      {featuredTrio.length > 0 && (
+        <div class="mt-7 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+          {featuredTrio.map((pauta) => (
+            <article class="group flex flex-col overflow-hidden rounded-[20px] bg-[var(--color-paper)] dark:bg-[var(--color-dark-surface)] transition-shadow duration-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_36px_rgba(0,0,0,0.35)]">
+              <a
+                href={`/pauta/${pauta.slug}`}
+                data-astro-prefetch="viewport"
+                class="flex flex-1 flex-col focus:outline-none"
+              >
+                <div class="overflow-hidden bg-[var(--color-rule)] dark:bg-[var(--color-dark-rule)]">
+                  <img
+                    src={pauta.imagem.url}
+                    alt={pauta.imagem.alt}
+                    width="800"
+                    height="450"
+                    loading="lazy"
+                    decoding="async"
+                    class="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                  />
                 </div>
 
-                <div class="mt-5 flex items-center justify-between text-[12px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                  <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
-                  <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                <div class="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+                      {pauta.trilhaLabel}
+                    </span>
+
+                    <h2 class="mt-2 text-[18px] font-bold leading-[1.25] tracking-[-0.018em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+                      {pauta.titulo}
+                    </h2>
+                  </div>
+
+                  <div class="mt-5 flex items-center justify-between text-[12px] font-medium text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                    <time datetime={pauta.dataISO}>{formatFullDate(pauta.dataISO)}</time>
+                    <span>{pauta.tempoLeitura.toLowerCase()}</span>
+                  </div>
                 </div>
-              </div>
-            </a>
-          </article>
-        ))}
-      </div>
+              </a>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   </div>
 
-  <!-- Section 2: "Mais do OlhaPauta" (Apple Newsroom Archive Grid with Trail Filter + SEO Internal Links) -->
-  <section id="indice" class="mx-auto max-w-[980px] px-5 pt-16 pb-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pb-5">
-      <h2 class="text-[24px] sm:text-[28px] font-bold tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-        Mais do OlhaPauta<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
-      </h2>
+  <!-- Section 2: "Mais do OlhaPauta" (only rendered when there are 2+ pautas) -->
+  {allPautas.length > 1 && (
+    <section id="indice" class="mx-auto max-w-[980px] px-5 pt-16 pb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] pb-5">
+        <h2 class="text-[24px] sm:text-[28px] font-bold tracking-[-0.025em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
+          Mais do OlhaPauta<span class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">.</span>
+        </h2>
 
-      <!-- Filter Pills -->
-      <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar pautas por trilha">
-        <button
-          type="button"
-          data-filter="all"
-          class="filter-btn active rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors cursor-pointer bg-[var(--color-ink)] text-[var(--color-paper)] border-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] dark:text-[var(--color-dark-paper)] dark:border-[var(--color-dark-ink)]"
-        >
-          Todas
-        </button>
-        {TRILHAS.map((trilha) => (
+        <!-- Filter Pills -->
+        <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar pautas por trilha">
           <button
             type="button"
-            id={`trilha-${trilha.slug}`}
-            data-filter={trilha.slug}
-            class="filter-btn rounded-full px-3.5 py-1.5 text-xs font-medium border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors cursor-pointer"
+            data-filter="all"
+            class="filter-btn active rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors cursor-pointer bg-[var(--color-ink)] text-[var(--color-paper)] border-[var(--color-ink)] dark:bg-[var(--color-dark-ink)] dark:text-[var(--color-dark-paper)] dark:border-[var(--color-dark-ink)]"
           >
-            {trilha.nome}
+            Todas
           </button>
+          {TRILHAS.map((trilha) => (
+            <button
+              type="button"
+              id={`trilha-${trilha.slug}`}
+              data-filter={trilha.slug}
+              class="filter-btn rounded-full px-3.5 py-1.5 text-xs font-medium border border-[var(--color-rule)] dark:border-[var(--color-dark-rule)] text-[var(--color-ink-muted)] dark:text-[var(--color-dark-muted)] hover:border-[var(--color-ink)] dark:hover:border-[var(--color-dark-ink)] transition-colors cursor-pointer"
+            >
+              {trilha.nome}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <!-- Compact 2-Column List -->
+      <div class="mt-2 grid gap-x-10 md:grid-cols-2 divide-y divide-[var(--color-rule)] dark:divide-[var(--color-dark-rule)] md:divide-y-0">
+        {allPautas.map((pauta) => (
+          <article
+            data-trilha={pauta.trilha}
+            class="pauta-row group py-6 md:border-b md:border-[var(--color-rule)] md:dark:border-[var(--color-dark-rule)]"
+          >
+            <a
+              href={`/pauta/${pauta.slug}`}
+              data-astro-prefetch="viewport"
+              class="flex items-start gap-4 focus:outline-none"
+            >
+              <div class="h-[88px] w-[124px] shrink-0 overflow-hidden rounded-xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)]">
+                <img
+                  src={pauta.imagem.url}
+                  alt={pauta.imagem.alt}
+                  width="248"
+                  height="176"
+                  loading="lazy"
+                  decoding="async"
+                  class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                />
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  {pauta.trilhaLabel}
+                </span>
+                <h3 class="mt-1 text-[15px] sm:text-[16px] font-semibold leading-[1.3] tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] group-hover:opacity-75 transition-opacity line-clamp-2">
+                  {pauta.titulo}
+                </h3>
+                <p class="mt-2 text-[12px] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                  {formatFullDate(pauta.dataISO)}
+                </p>
+              </div>
+            </a>
+          </article>
         ))}
       </div>
-    </div>
 
-    <!-- Compact 2-Column List (Apple Newsroom "More from Newsroom" style) -->
-    <div class="mt-2 grid gap-x-10 md:grid-cols-2 divide-y divide-[var(--color-rule)] dark:divide-[var(--color-dark-rule)] md:divide-y-0">
-      {allPautas.map((pauta) => (
-        <article
-          data-trilha={pauta.trilha}
-          class="pauta-row group py-6 md:border-b md:border-[var(--color-rule)] md:dark:border-[var(--color-dark-rule)]"
-        >
+      {allPautas.length > 6 && (
+        <div class="mt-10 flex items-center justify-center">
           <a
-            href={`/pauta/${pauta.slug}`}
+            href="/pagina/2"
             data-astro-prefetch="viewport"
-            class="flex items-start gap-4 focus:outline-none"
+            class="group inline-flex items-center gap-3 rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-6 py-3 text-[13px] font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity"
           >
-            <div class="h-[88px] w-[124px] shrink-0 overflow-hidden rounded-xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)]">
-              <img
-                src={pauta.imagem.url}
-                alt={pauta.imagem.alt}
-                width="248"
-                height="176"
-                loading="lazy"
-                decoding="async"
-                class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-              />
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                {pauta.trilhaLabel}
-              </span>
-              <h3 class="mt-1 text-[15px] sm:text-[16px] font-semibold leading-[1.3] tracking-[-0.015em] text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] group-hover:opacity-75 transition-opacity line-clamp-2">
-                {pauta.titulo}
-              </h3>
-              <p class="mt-2 text-[12px] text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                {formatFullDate(pauta.dataISO)}
-              </p>
-            </div>
+            <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
+            <span>Ver mais pautas</span>
+            <span class="text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] transition-transform group-hover:translate-x-1">→</span>
           </a>
-        </article>
-      ))}
-    </div>
-
-    <!-- Pagination CTA with Signature Animated Red Dot -->
-    <div class="mt-10 flex items-center justify-center">
-      <a
-        href="/pagina/2"
-        data-astro-prefetch="viewport"
-        class="group inline-flex items-center gap-3 rounded-full bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)] px-6 py-3 text-[13px] font-semibold text-[var(--color-ink)] dark:text-[var(--color-dark-ink)] hover:opacity-80 transition-opacity"
-      >
-        <span class="op-dot-hover inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)]"></span>
-        <span>Ver mais pautas</span>
-        <span class="text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)] transition-transform group-hover:translate-x-1">→</span>
-      </a>
-    </div>
-  </section>
+        </div>
+      )}
+    </section>
+  )}
 
   <!-- Section 3: Clean Newsletter Band -->
   <section class="mx-auto max-w-[980px] px-5 pt-12">
