@@ -99,31 +99,33 @@ function stripHtmlToText(html: string): string {
 
 async function fetchReferenceSnippets(urls: string[]): Promise<string> {
   if (!urls.length) return '';
-  const snippets: string[] = [];
-  for (const rawUrl of urls.slice(0, 3)) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    try {
-      const safe = assertSafeExternalUrl(rawUrl);
-      const res = await fetch(safe.toString(), {
-        signal: controller.signal,
-        redirect: 'error',
-        headers: { 'User-Agent': 'OlhaPautaBot/1.0 (+https://olhapauta.com.br)' },
-      });
-      if (res.ok) {
-        const bytes = await readResponseBytesWithLimit(res, 512 * 1024);
-        const text = stripHtmlToText(new TextDecoder().decode(bytes));
-        if (text.length > 100) {
-          snippets.push(`FONTE (${safe.toString()}):\n${text}`);
+  const results = await Promise.all(
+    urls.slice(0, 2).map(async (rawUrl) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const safe = assertSafeExternalUrl(rawUrl);
+        const res = await fetch(safe.toString(), {
+          signal: controller.signal,
+          redirect: 'error',
+          headers: { 'User-Agent': 'OlhaPautaBot/1.0 (+https://olhapauta.com.br)' },
+        });
+        if (res.ok) {
+          const bytes = await readResponseBytesWithLimit(res, 256 * 1024);
+          const text = stripHtmlToText(new TextDecoder().decode(bytes));
+          if (text.length > 100) {
+            return `FONTE (${safe.toString()}):\n${text}`;
+          }
         }
+      } catch {
+        // Ignore unreachable or blocked reference URLs
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch {
-      // Ignore unreachable or blocked reference URLs
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-  return snippets.join('\n\n');
+      return '';
+    })
+  );
+  return results.filter(Boolean).join('\n\n');
 }
 
 async function searchWithTavily(
@@ -221,7 +223,7 @@ async function callProvider(
     throw new Error('Chave de API não configurada em Minha IA (API).');
   }
 
-  const reqSignal = signal || AbortSignal.timeout(45000);
+  const reqSignal = signal || AbortSignal.timeout(90000);
 
   if (settings.ai_provider === 'anthropic') {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -476,18 +478,22 @@ export async function generatePautaDraft(
       : 'Foco GOOGLE SEARCH + AIO/GEO: guia prático aprofundado, resposta direta logo no primeiro parágrafo, passo a passo e comparativo objetivo.';
 
   const userSources = input.sourceUrls || [];
-  const fetchedRefs = await fetchReferenceSnippets(userSources);
-
   let tavilyContext = '';
   let discoveredUrls: string[] = [];
   let webSearchUsed = 'none';
 
-  // If Tavily is configured and web search is enabled (for non-Gemini or as extra grounding)
-  if (input.useWebSearch && settings.search_api_key && settings.ai_provider !== 'gemini') {
-    const tv = await searchWithTavily(settings.search_api_key, `${input.topic} inteligência artificial Brasil 2026`);
-    tavilyContext = tv.context;
-    discoveredUrls = tv.urls;
-    if (tv.context) webSearchUsed = 'tavily';
+  // Run reference URL fetches and Tavily web search in parallel (faster, avoids Worker timeouts)
+  const [fetchedRefs, tvResult] = await Promise.all([
+    fetchReferenceSnippets(userSources),
+    input.useWebSearch && settings.search_api_key && settings.ai_provider !== 'gemini'
+      ? searchWithTavily(settings.search_api_key, `${input.topic} inteligência artificial Brasil 2026`)
+      : Promise.resolve({ context: '', urls: [] as string[] }),
+  ]);
+
+  if (tvResult.context) {
+    tavilyContext = tvResult.context;
+    discoveredUrls = tvResult.urls;
+    webSearchUsed = 'tavily';
   }
 
   const contextBlocks = [
