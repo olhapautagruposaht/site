@@ -232,7 +232,7 @@ async function callProvider(
     throw new Error('Chave de API não configurada em Minha IA (API).');
   }
 
-  const reqSignal = signal || AbortSignal.timeout(90000);
+  const reqSignal = signal || AbortSignal.timeout(75000);
   const sysPrompt = customSystemPrompt || SYSTEM_PROMPT;
 
   if (settings.ai_provider === 'anthropic') {
@@ -305,8 +305,14 @@ async function callProvider(
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Provedor ${settings.ai_provider} HTTP ${res.status}: ${errText.slice(0, 240)}`);
+      let errSnippet = '';
+      try {
+        const errBytes = await readResponseBytesWithLimit(res, 16 * 1024);
+        errSnippet = new TextDecoder().decode(errBytes).slice(0, 240);
+      } catch {
+        errSnippet = `HTTP ${res.status}`;
+      }
+      throw new Error(`Provedor ${settings.ai_provider} HTTP ${res.status}: ${errSnippet}`);
     }
 
     const data = (await res.json()) as {
@@ -315,15 +321,20 @@ async function callProvider(
         message?: { content?: string | null; reasoning_content?: string | null };
       }[];
     };
+    const msg = data.choices?.[0]?.message;
+    const rawContent = (msg?.content || '').trim();
+    const rawReasoning = (msg?.reasoning_content || '').trim();
+    const candidate =
+      rawContent || (rawReasoning.includes('{') && rawReasoning.includes('}') ? rawReasoning : '');
     return {
-      content: (data.choices?.[0]?.message?.content || '').trim(),
+      content: candidate,
       finishReason: data.choices?.[0]?.finish_reason || 'unknown',
     };
   };
 
   let attempt = await runChatRequest(jsonMode);
-  if (!attempt.content && jsonMode) {
-    // Some reasoning/gateway models return empty content when json_object is set on long outputs
+  if (!attempt.content && jsonMode && !reqSignal.aborted) {
+    // Single fallback retry sharing the same overall AbortSignal budget
     attempt = await runChatRequest(false);
   }
   if (!attempt.content) {
@@ -603,7 +614,7 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
     discoveredUrls = [...discoveredUrls, ...gem.groundingUrls];
     webSearchUsed = 'gemini-google-search';
   } else {
-    raw = await callProvider(settings, userPrompt, 12000, undefined, true);
+    raw = await callProvider(settings, userPrompt, 8192, undefined, true);
     if (fetchedRefs && webSearchUsed === 'none') {
       webSearchUsed = 'reference-urls';
     }
