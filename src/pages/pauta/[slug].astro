@@ -480,7 +480,9 @@ const jsonLd = {
                 </div>
                 {(section.image.caption || section.image.credit) && (
                   <figcaption class="mt-2.5 text-center text-[12px] leading-relaxed text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
-                    {section.image.caption || section.image.credit}
+                    {[section.image.caption, section.image.credit && section.image.credit !== section.image.caption ? section.image.credit : '']
+                      .filter(Boolean)
+                      .join(' · ')}
                   </figcaption>
                 )}
               </figure>

@@ -640,13 +640,37 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
     .filter(Boolean)
     .slice(0, 5);
 
-  // Extrai automaticamente um vídeo real do YouTube apenas se veio da pesquisa/fontes reais (nunca inventado pela IA)
+  // Extrai e verifica um vídeo real e incorporável do YouTube (valida hostname + oEmbed, nunca aceita URL fabricada)
   let detectedVideoUrl: string | null = null;
   for (const rawUrl of allCandidateUrls) {
-    const match = rawUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (match?.[1]) {
-      detectedVideoUrl = `https://www.youtube.com/watch?v=${match[1]}`;
-      break;
+    try {
+      const parsedUrl = new URL(rawUrl);
+      const host = parsedUrl.hostname.toLowerCase();
+      let videoId: string | null = null;
+      if (host === 'youtu.be') {
+        const seg = parsedUrl.pathname.replace(/^\/+/, '').split('/')[0];
+        if (seg && /^[a-zA-Z0-9_-]{11}$/.test(seg)) videoId = seg;
+      } else if (host === 'youtube.com' || host === 'www.youtube.com' || host === 'm.youtube.com') {
+        if (parsedUrl.pathname === '/watch') {
+          const v = parsedUrl.searchParams.get('v');
+          if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) videoId = v;
+        } else {
+          const m = parsedUrl.pathname.match(/^\/(?:embed|shorts)\/([a-zA-Z0-9_-]{11})/);
+          if (m?.[1]) videoId = m[1];
+        }
+      }
+      if (!videoId) continue;
+      const canonicalWatch = `https://www.youtube.com/watch?v=${videoId}`;
+      const oembedRes = await fetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalWatch)}&format=json`,
+        { signal: AbortSignal.timeout(3500) }
+      );
+      if (oembedRes.ok) {
+        detectedVideoUrl = canonicalWatch;
+        break;
+      }
+    } catch {
+      continue;
     }
   }
 

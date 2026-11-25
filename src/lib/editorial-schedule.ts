@@ -51,11 +51,11 @@ export function isScheduledPauta(row: { status?: string; published_at?: string |
   return !Number.isNaN(ts) && ts > now.getTime();
 }
 
-export function computeNextPrimeSlot(
+export function findNextPrimeSlot(
   existingPublishedIsos: (string | null | undefined)[],
   dailyLimit = 3,
   now = new Date()
-): PrimeSlot {
+): PrimeSlot | null {
   const clampedLimit = Math.max(1, Math.min(3, Math.round(dailyLimit)));
   const slotsForDay = PRIME_SLOTS_BY_LIMIT[clampedLimit] || PRIME_SLOTS_BY_LIMIT[3];
 
@@ -107,6 +107,16 @@ export function computeNextPrimeSlot(
     }
   }
 
+  return null;
+}
+
+export function computeNextPrimeSlot(
+  existingPublishedIsos: (string | null | undefined)[],
+  dailyLimit = 3,
+  now = new Date()
+): PrimeSlot {
+  const found = findNextPrimeSlot(existingPublishedIsos, dailyLimit, now);
+  if (found) return found;
   const fallback = new Date(now.getTime() + 3600000);
   return {
     iso: fallback.toISOString(),

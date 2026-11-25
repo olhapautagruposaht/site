@@ -11,7 +11,7 @@ import {
   type PautaPayload,
 } from '../../../lib/editorial-validator';
 import {
-  computeNextPrimeSlot,
+  findNextPrimeSlot,
   formatBrtDateTime,
   getEditorialRhythmMetrics,
 } from '../../../lib/editorial-schedule';
@@ -117,16 +117,31 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     let scheduledDate: Date | null = null;
     let scheduledLabel: string | null = null;
     if (status === 'published' && payload.auto_schedule) {
-      const { data: existingSched } = await client
+      // Janela relevante: desde o início de ontem até +31 dias, ordenado crescente para nunca perder slots próximos
+      const windowStartIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existingSched, error: schedErr } = await client
         .from('pautas')
         .select('published_at')
         .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(60);
-      const nextSlot = computeNextPrimeSlot(
+        .gte('published_at', windowStartIso)
+        .order('published_at', { ascending: true })
+        .limit(200);
+      if (schedErr) {
+        return new Response(
+          JSON.stringify({ ok: false, error: `Falha ao consultar calendário editorial: ${schedErr.message}` }),
+          { status: 500, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+        );
+      }
+      const nextSlot = findNextPrimeSlot(
         (existingSched || []).map((r) => r.published_at),
         payload.daily_limit === 2 ? 2 : 3
       );
+      if (!nextSlot) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Calendário cheio pelos próximos 30 dias. Salve como rascunho ou ajuste a fila.' }),
+          { status: 409, headers: { 'Content-Type': 'application/json', ...NOINDEX_HEADERS } }
+        );
+      }
       scheduledDate = new Date(nextSlot.iso);
       scheduledLabel = nextSlot.shortLabel;
     } else if (status === 'published' && payload.scheduled_at) {
