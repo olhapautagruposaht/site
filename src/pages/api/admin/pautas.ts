@@ -10,7 +10,11 @@ import {
   slugify,
   type PautaPayload,
 } from '../../../lib/editorial-validator';
-import { getEditorialRhythmMetrics } from '../../../lib/editorial-schedule';
+import {
+  computeNextPrimeSlot,
+  formatBrtDateTime,
+  getEditorialRhythmMetrics,
+} from '../../../lib/editorial-schedule';
 
 const INDEXNOW_KEY = '9f4c2a8e1b7d4065a3c9e2f8d1b4a6c0';
 
@@ -104,12 +108,28 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const payload = (await request.json()) as PautaPayload & {
       force?: boolean;
       scheduled_at?: string | null;
+      auto_schedule?: boolean;
+      daily_limit?: number;
     };
     const status = payload.status || 'draft';
     const quality = evaluatePautaQuality(payload);
 
     let scheduledDate: Date | null = null;
-    if (status === 'published' && payload.scheduled_at) {
+    let scheduledLabel: string | null = null;
+    if (status === 'published' && payload.auto_schedule) {
+      const { data: existingSched } = await client
+        .from('pautas')
+        .select('published_at')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(60);
+      const nextSlot = computeNextPrimeSlot(
+        (existingSched || []).map((r) => r.published_at),
+        payload.daily_limit === 2 ? 2 : 3
+      );
+      scheduledDate = new Date(nextSlot.iso);
+      scheduledLabel = nextSlot.shortLabel;
+    } else if (status === 'published' && payload.scheduled_at) {
       const parsed = new Date(payload.scheduled_at);
       if (Number.isNaN(parsed.getTime())) {
         return new Response(
@@ -119,6 +139,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       }
       if (parsed.getTime() > Date.now() + 60 * 1000) {
         scheduledDate = parsed;
+        scheduledLabel = formatBrtDateTime(parsed.toISOString());
       }
     }
 
@@ -219,6 +240,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         quality,
         scheduled: Boolean(scheduledDate),
         scheduledAt: scheduledDate ? scheduledDate.toISOString() : null,
+        scheduledLabel,
         indexNowSent,
         rhythm,
         url: `https://olhapauta.com.br/pauta/${result.data.slug}`,

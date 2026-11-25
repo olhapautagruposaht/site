@@ -115,8 +115,33 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
     </div>
 
     <!-- Trending Suggestions Grid (populated on 1 click) -->
-    <div id="trends-wrap" class="hidden space-y-2.5">
-      <p id="trends-label" class="text-[11px] font-bold uppercase tracking-wider text-black/50"></p>
+    <div id="trends-wrap" class="hidden space-y-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p id="trends-label" class="text-[11px] font-bold uppercase tracking-wider text-black/50"></p>
+        <div class="flex flex-wrap items-center gap-2">
+          <select
+            id="batch-count"
+            class="rounded-full border border-black/15 bg-[#F5F5F7] px-3 py-1.5 text-[11px] font-semibold text-[#1D1D1F]"
+          >
+            <option value="3">Planejar 3 pautas (1 dia)</option>
+            <option value="5">Planejar todas pendentes</option>
+          </select>
+          <button
+            id="btn-run-batch"
+            type="button"
+            class="rounded-full bg-blue-600 px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 cursor-pointer"
+          >
+            🗓️ Gerar e agendar lote nos horários nobres
+          </button>
+          <button
+            id="btn-stop-batch"
+            type="button"
+            class="hidden rounded-full border border-red-300 bg-red-50 px-3 py-1.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 cursor-pointer"
+          >
+            Parar lote
+          </button>
+        </div>
+      </div>
       <div id="trends-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
     </div>
 
@@ -164,6 +189,10 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
         <label class="inline-flex items-center gap-2 text-xs font-semibold text-black/75 cursor-pointer">
           <input id="ai-auto-cover" type="checkbox" checked class="h-4 w-4 rounded accent-[#D92B2B]" />
           Gerar capa 16:9 automaticamente
+        </label>
+        <label class="inline-flex items-center gap-2 text-xs font-semibold text-black/75 cursor-pointer">
+          <input id="ai-mid-image" type="checkbox" checked class="h-4 w-4 rounded accent-[#D92B2B]" />
+          Gerar 1 imagem no meio do texto
         </label>
       </div>
     </div>
@@ -578,9 +607,20 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
             <button type="button" data-add-sub="${idx}" class="text-xs font-semibold text-black/65 hover:text-black cursor-pointer">+ Adicionar subseção H3</button>
           </div>
 
-          <details class="text-xs text-black/60">
-            <summary class="cursor-pointer font-semibold">Extras opcionais (citação, callout, lista)</summary>
+          <details class="text-xs text-black/60" ${sec.imageUrl ? 'open' : ''}>
+            <summary class="cursor-pointer font-semibold">Extras opcionais (imagem no meio do texto, citação, callout, lista)</summary>
             <div class="mt-2 space-y-2">
+              <div class="rounded-xl border border-black/10 bg-white p-2.5 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-black/45">Imagem nesta seção (16:9)</span>
+                  <button type="button" data-gen-sec-img="${idx}" class="rounded-full bg-[#D92B2B] px-2.5 py-1 text-[10px] font-semibold text-white hover:opacity-90 cursor-pointer">✦ Gerar imagem 16:9</button>
+                </div>
+                <input type="url" data-sec-field="imageUrl" data-idx="${idx}" value="${escHtml(sec.imageUrl || '')}" placeholder="URL da imagem desta seção (opcional)" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs" />
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <input type="text" data-sec-field="imageAlt" data-idx="${idx}" value="${escHtml(sec.imageAlt || '')}" placeholder="Alt descritivo da imagem" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs" />
+                  <input type="text" data-sec-field="imageCaption" data-idx="${idx}" value="${escHtml(sec.imageCaption || '')}" placeholder="Legenda abaixo da imagem (opcional)" class="w-full rounded-lg border border-black/15 px-2.5 py-1.5 text-xs" />
+                </div>
+              </div>
               <input type="text" data-sec-field="quote" data-idx="${idx}" value="${escHtml(sec.quote)}" placeholder="Citação editorial de destaque (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
               <input type="text" data-sec-field="calloutText" data-idx="${idx}" value="${escHtml(sec.calloutText)}" placeholder="Box de contexto / callout (opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs" />
               <textarea rows="2" data-sec-field="bullets" data-idx="${idx}" placeholder="Itens em lista (1 item por linha, opcional)" class="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs">${escHtml(sec.bullets)}</textarea>
@@ -643,6 +683,40 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
           updateQuality();
         });
       });
+
+      container.querySelectorAll('[data-gen-sec-img]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const i = Number(btn.dataset.genSecImg);
+          const sec = sectionsState[i];
+          const secHeading = (sec?.heading || $('f-titulo').value || '').trim();
+          if (!secHeading) return;
+          btn.disabled = true;
+          btn.textContent = 'Gerando...';
+          showWorkingPill(`Gerando imagem 16:9 para a seção #${i + 1}...`);
+          try {
+            const res = await fetch('/api/admin/generate-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                titulo: secHeading,
+                trilha: $('f-trilha').value,
+                prompt: sec.imageAlt?.trim() || secHeading,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Falha ao gerar imagem.');
+            sectionsState[i].imageUrl = data.url;
+            if (!sectionsState[i].imageAlt) sectionsState[i].imageAlt = secHeading;
+            if (!sectionsState[i].imageCaption) sectionsState[i].imageCaption = 'Ilustração Editorial OlhaPauta';
+            renderSections();
+            updateQuality();
+          } catch (err) {
+            alert(`Erro ao gerar imagem da seção: ${err.message}`);
+          } finally {
+            hideWorkingPill();
+          }
+        });
+      });
     };
 
     const renderFaqs = () => {
@@ -692,6 +766,13 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
             }))
             .filter((sub) => sub.heading || sub.paragraphs.length > 0);
           if (subs.length > 0) out.subsections = subs;
+          if (s.imageUrl?.trim()) {
+            out.image = {
+              url: s.imageUrl.trim(),
+              alt: (s.imageAlt || s.heading || $('f-titulo').value || 'Imagem editorial').trim(),
+              caption: (s.imageCaption || '').trim() || undefined,
+            };
+          }
           if (s.quote?.trim()) out.quote = s.quote.trim();
           if (s.calloutText?.trim()) out.callout = { label: 'Contexto', text: s.calloutText.trim() };
           const bullets = (s.bullets || '').split('\n').map((b) => b.trim()).filter(Boolean);
@@ -826,6 +907,9 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
           quote: s.quote || '',
           calloutText: s.callout?.text || '',
           bullets: Array.isArray(s.bullets) ? s.bullets.join('\n') : '',
+          imageUrl: s.image?.url || '',
+          imageAlt: s.image?.alt || '',
+          imageCaption: s.image?.caption || '',
         }));
       }
       if (Array.isArray(data.faqs) && data.faqs.length > 0) {
@@ -1137,7 +1221,34 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
               $('f-imagem-url').value = imgData.url;
               $('f-imagem-credito').value = 'Ilustração Editorial OlhaPauta';
               updateQuality();
-              st.textContent = `Tudo pronto (${imgData.providerUsed}${searchLabel})! Confira o Semáforo Google à direita e clique em "Publicar agora" ou "Agendar".`;
+
+              if ($('ai-mid-image')?.checked && sectionsState.length >= 2) {
+                const midIdx = 1;
+                const midHeading = (sectionsState[midIdx]?.heading || $('f-titulo').value || '').trim();
+                showWorkingPill('Gerando imagem complementar no meio do texto...');
+                try {
+                  const midRes = await fetch('/api/admin/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      titulo: midHeading,
+                      trilha: $('f-trilha').value,
+                      prompt: `Cena editorial complementar diferente da capa ilustrando: ${midHeading}`,
+                    }),
+                  });
+                  const midData = await midRes.json();
+                  if (midRes.ok && midData.ok) {
+                    sectionsState[midIdx].imageUrl = midData.url;
+                    sectionsState[midIdx].imageAlt = midHeading;
+                    sectionsState[midIdx].imageCaption = 'Ilustração Editorial OlhaPauta';
+                    renderSections();
+                    updateQuality();
+                  }
+                } catch {}
+              }
+
+              const videoNote = $('f-video-url').value.trim() ? ' · vídeo YouTube detectado' : '';
+              st.textContent = `Tudo pronto (${imgData.providerUsed}${searchLabel}${videoNote})! Confira o Semáforo Google à direita e clique em "Publicar agora" ou "Agendar".`;
               st.className = 'rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800';
             } else {
               st.textContent = `Texto pronto${searchLabel}, mas a capa falhou (${imgData.error || 'erro'}). Você pode subir uma foto ou ajustar o provedor de imagem em Minha IA.`;
@@ -1194,20 +1305,23 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
       const wrap = $('trends-wrap');
       const list = $('trends-list');
       const usedSet = new Set(Array.isArray(cache.usedIndexes) ? cache.usedIndexes : []);
+      const statusMap = cache.statusByIndex || {};
 
       $('trends-label').textContent = `${cache.items.length} pautas em alta hoje (${cache.webSearchUsed || 'cache'}) — salvas no seu navegador para não gastar busca de novo:`;
       list.innerHTML = cache.items
         .map((item, idx) => {
           const isUsed = usedSet.has(idx);
+          const customStatus = statusMap[String(idx)] || (isUsed ? '✓ Já gerada' : '');
+          const isWarn = customStatus.startsWith('⚠');
           return `
-          <div class="flex flex-col justify-between rounded-2xl border ${isUsed ? 'border-emerald-200 bg-emerald-50/40' : 'border-black/10 bg-[#F5F5F7]/70'} p-4 space-y-2.5">
+          <div class="flex flex-col justify-between rounded-2xl border ${isWarn ? 'border-amber-200 bg-amber-50/40' : isUsed ? 'border-emerald-200 bg-emerald-50/40' : 'border-black/10 bg-[#F5F5F7]/70'} p-4 space-y-2.5">
             <div>
               <div class="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
                 <div class="flex items-center gap-2">
                   <span class="text-[#D92B2B]">${escHtml(item.trilha)}</span>
                   <span class="rounded-full bg-black/5 px-2 py-0.5 text-black/60">${item.foco === 'search' ? 'Search / AIO' : 'Discover'}</span>
                 </div>
-                ${isUsed ? '<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">✓ Já gerada</span>' : ''}
+                ${customStatus ? `<span class="rounded-full ${isWarn ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800'} px-2 py-0.5">${escHtml(customStatus)}</span>` : ''}
               </div>
               <p class="mt-1.5 text-xs font-bold leading-snug text-[#1D1D1F]">${escHtml(item.titulo)}</p>
               <p class="mt-1 text-[11px] leading-relaxed text-black/65">${escHtml(item.angulo)}</p>
@@ -1232,7 +1346,11 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
           const chosen = cache.items[idx];
           if (!chosen) return;
           const nextUsed = Array.from(new Set([...(cache.usedIndexes || []), idx]));
-          const updatedCache = { ...cache, usedIndexes: nextUsed };
+          const updatedCache = {
+            ...cache,
+            usedIndexes: nextUsed,
+            statusByIndex: { ...(cache.statusByIndex || {}), [String(idx)]: '✓ Já gerada' },
+          };
           saveTrendsCache(updatedCache);
 
           $('f-trilha').value = chosen.trilha;
@@ -1251,6 +1369,219 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
         });
       });
     };
+
+    // Planejador em lote (sequencial, com Quality Gate + horários nobres 08h00 / 12h30 / 18h30 BRT)
+    let batchAbortRequested = false;
+    $('btn-stop-batch')?.addEventListener('click', () => {
+      batchAbortRequested = true;
+      showWorkingPill('Parando lote após a pauta atual...');
+    });
+
+    $('btn-run-batch')?.addEventListener('click', async () => {
+      const cache = loadTrendsCache();
+      if (!cache || !Array.isArray(cache.items) || cache.items.length === 0) return;
+      const usedSet = new Set(Array.isArray(cache.usedIndexes) ? cache.usedIndexes : []);
+      const maxCount = Number($('batch-count')?.value || 3);
+      const pendingIndexes = cache.items
+        .map((_, idx) => idx)
+        .filter((idx) => !usedSet.has(idx))
+        .slice(0, maxCount);
+
+      if (pendingIndexes.length === 0) {
+        alert('Todas as pautas pesquisadas hoje já foram geradas! Clique em "✦ Buscar o que está em alta hoje" para pesquisar novas.');
+        return;
+      }
+
+      if (
+        !confirm(
+          `Vou gerar ${pendingIndexes.length} pauta(s) em sequência (texto + capa 16:9${$('ai-mid-image')?.checked ? ' + imagem no meio do texto' : ''}) e agendar automaticamente nos próximos horários nobres do Discover (08h00, 12h30, 18h30 BRT).\n\nSe alguma não passar no Quality Gate, ela será salva como Rascunho para sua revisão. Deseja começar?`
+        )
+      ) {
+        return;
+      }
+
+      batchAbortRequested = false;
+      const batchBtn = $('btn-run-batch');
+      const stopBtn = $('btn-stop-batch');
+      const st = $('ai-status');
+      if (batchBtn) batchBtn.disabled = true;
+      if (stopBtn) stopBtn.classList.remove('hidden');
+
+      let scheduledOk = 0;
+      let savedAsDraft = 0;
+      let workingCache = {
+        ...cache,
+        usedIndexes: [...(cache.usedIndexes || [])],
+        statusByIndex: { ...(cache.statusByIndex || {}) },
+      };
+
+      try {
+        for (let step = 0; step < pendingIndexes.length; step++) {
+          if (batchAbortRequested) break;
+          const idx = pendingIndexes[step];
+          const item = workingCache.items[idx];
+          const labelStep = `Lote ${step + 1}/${pendingIndexes.length}`;
+
+          showWorkingPill(`${labelStep}: escrevendo "${item.titulo.slice(0, 38)}..."`);
+          st.textContent = `${labelStep}: pesquisando na web e escrevendo "${item.titulo}"...`;
+          st.className = 'rounded-xl bg-black/[0.04] px-3.5 py-2.5 text-xs font-medium text-black/75';
+
+          const genRes = await fetch('/api/admin/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: `${item.titulo}. ${item.angulo}`,
+              trilha: item.trilha,
+              foco: item.foco,
+              use_web_search: $('ai-web-search').checked,
+              source_urls: item.source_urls || [],
+            }),
+          });
+          const genData = await genRes.json();
+          if (!genRes.ok || !genData.ok || !genData.draft) {
+            workingCache.statusByIndex[String(idx)] = '⚠ Erro ao gerar';
+            saveTrendsCache(workingCache);
+            renderTrendsList(workingCache);
+            continue;
+          }
+
+          const draft = genData.draft;
+          const draftTitulo = (draft.titulo || item.titulo || '').trim();
+          const draftSlug = slugify(draft.slug || draftTitulo);
+
+          // Capa 16:9
+          if ($('ai-auto-cover').checked) {
+            showWorkingPill(`${labelStep}: gerando capa 16:9...`);
+            try {
+              const imgRes = await fetch('/api/admin/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  titulo: draftTitulo,
+                  trilha: item.trilha,
+                  prompt: draft.imagem_alt || draftTitulo,
+                }),
+              });
+              const imgData = await imgRes.json();
+              if (imgRes.ok && imgData.ok) {
+                draft.imagem_url = imgData.url;
+                draft.imagem_credito = 'Ilustração Editorial OlhaPauta';
+              }
+            } catch {}
+          }
+
+          // Imagem complementar no meio do texto (seção #2)
+          if ($('ai-mid-image')?.checked && Array.isArray(draft.conteudo) && draft.conteudo.length >= 2) {
+            const midSec = draft.conteudo[1];
+            const midHeading = (midSec?.heading || draftTitulo).trim();
+            showWorkingPill(`${labelStep}: gerando imagem do meio do texto...`);
+            try {
+              const midRes = await fetch('/api/admin/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  titulo: midHeading,
+                  trilha: item.trilha,
+                  prompt: `Cena editorial complementar diferente da capa ilustrando: ${midHeading}`,
+                }),
+              });
+              const midData = await midRes.json();
+              if (midRes.ok && midData.ok) {
+                midSec.image = {
+                  url: midData.url,
+                  alt: midHeading,
+                  caption: 'Ilustração Editorial OlhaPauta',
+                };
+              }
+            } catch {}
+          }
+
+          // Garante link interno se já houver pautas publicadas
+          const draftText = JSON.stringify(draft.conteudo || []);
+          const otherPub = (publishedLinks || []).filter((p) => p.slug !== draftSlug);
+          if (otherPub.length > 0 && !/\/pauta\/[a-z0-9-]+/i.test(draftText) && Array.isArray(draft.conteudo) && draft.conteudo.length > 0) {
+            const pick = otherPub.find((p) => p.trilha === item.trilha) || otherPub[0];
+            const tIdx = draft.conteudo.length >= 2 ? 1 : 0;
+            draft.conteudo[tIdx].paragraphs = [
+              ...(draft.conteudo[tIdx].paragraphs || []),
+              `Leia também: [${pick.titulo}](/pauta/${pick.slug}).`,
+            ];
+          }
+
+          // Agenda no próximo horário nobre livre; se Quality Gate bloquear (422), salva como rascunho seguro
+          const slot = getActivePrimeSlot();
+          showWorkingPill(`${labelStep}: agendando para ${slot?.shortLabel || 'próximo horário'}...`);
+          const savePayload = {
+            trilha: item.trilha,
+            status: 'published',
+            destaque: false,
+            titulo: draftTitulo,
+            slug: draftSlug,
+            subtitulo: draft.subtitulo || item.angulo || '',
+            resumo_curto: draft.resumo_curto || draft.subtitulo || item.angulo || '',
+            tldr: Array.isArray(draft.tldr) ? draft.tldr : [],
+            conteudo: Array.isArray(draft.conteudo) ? draft.conteudo : [],
+            faqs: Array.isArray(draft.faqs) ? draft.faqs : [],
+            tags: Array.isArray(draft.tags) ? draft.tags : [],
+            imagem_url: draft.imagem_url || '',
+            imagem_alt: draft.imagem_alt || draftTitulo,
+            imagem_credito: draft.imagem_credito || 'Ilustração Editorial OlhaPauta',
+            video_url: draft.video_url || null,
+            source_urls: Array.isArray(draft.source_urls) ? draft.source_urls : [],
+            autor_nome: 'Jonathas Costa',
+            autor_cargo: 'Fundador & Editor',
+            auto_schedule: true,
+            daily_limit: getDailyLimit(),
+            force: false,
+          };
+
+          const saveRes = await fetch('/api/admin/pautas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(savePayload),
+          });
+          const saveData = await saveRes.json();
+
+          if (saveRes.ok && saveData.ok) {
+            scheduledOk++;
+            if (saveData.rhythm) {
+              Object.assign(rhythm, saveData.rhythm);
+              refreshScheduleButtonUi();
+            }
+            workingCache.usedIndexes = Array.from(new Set([...workingCache.usedIndexes, idx]));
+            workingCache.statusByIndex[String(idx)] = `✓ Agendada · ${saveData.scheduledLabel || slot?.shortLabel || 'OK'}`;
+          } else {
+            // Fallback seguro: salva como rascunho para revisão humana de 2 min
+            const draftRes = await fetch('/api/admin/pautas', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...savePayload, status: 'draft', auto_schedule: false }),
+            });
+            const draftData = await draftRes.json();
+            if (draftRes.ok && draftData.ok) {
+              savedAsDraft++;
+              workingCache.usedIndexes = Array.from(new Set([...workingCache.usedIndexes, idx]));
+              workingCache.statusByIndex[String(idx)] = '⚠ Rascunho (revisar)';
+            } else {
+              workingCache.statusByIndex[String(idx)] = '⚠ Erro ao salvar';
+            }
+          }
+
+          saveTrendsCache(workingCache);
+          renderTrendsList(workingCache);
+        }
+
+        const fb = $('save-feedback');
+        fb.className = 'mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-900';
+        fb.innerHTML = `Lote concluído: <strong>${scheduledOk} agendada(s)</strong> nos horários nobres${savedAsDraft ? ` · <strong>${savedAsDraft} salva(s) como rascunho</strong> para revisão` : ''}. <a href="/admin" class="underline ml-1">Ver fila no painel →</a>`;
+        st.textContent = `Planejamento em lote finalizado (${scheduledOk} agendadas${savedAsDraft ? `, ${savedAsDraft} em rascunho` : ''}).`;
+        st.className = 'rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800';
+      } finally {
+        hideWorkingPill();
+        if (batchBtn) batchBtn.disabled = false;
+        if (stopBtn) stopBtn.classList.add('hidden');
+      }
+    });
 
     // Restaura automaticamente as pautas pesquisadas hoje (evita gastar Tavily/IA de novo após publicar ou recarregar)
     const cachedTrendsToday = loadTrendsCache();

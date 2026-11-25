@@ -634,16 +634,28 @@ Lembre-se: ZERO travessões (— ou –), texto profundo com 900+ palavras, 4 a 
   }
 
   const parsed = parseAiJson<Partial<PautaPayload>>(raw);
-  const mergedSources = Array.from(new Set([...userSources, ...discoveredUrls]))
+  const allCandidateUrls = Array.from(new Set([...userSources, ...discoveredUrls]));
+  const mergedSources = allCandidateUrls
     .map(isEditorialSourceUrl)
     .filter(Boolean)
     .slice(0, 5);
+
+  // Extrai automaticamente um vídeo real do YouTube apenas se veio da pesquisa/fontes reais (nunca inventado pela IA)
+  let detectedVideoUrl: string | null = null;
+  for (const rawUrl of allCandidateUrls) {
+    const match = rawUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (match?.[1]) {
+      detectedVideoUrl = `https://www.youtube.com/watch?v=${match[1]}`;
+      break;
+    }
+  }
 
   return {
     draft: {
       ...parsed,
       trilha: input.trilha,
       source_urls: mergedSources,
+      video_url: detectedVideoUrl,
     },
     webSearchUsed,
   };

@@ -171,24 +171,32 @@ if (pauta.faqs && pauta.faqs.length > 0) {
   });
 }
 
-if (pauta.videoUrl) {
-  graph.push({
-    '@type': 'VideoObject',
-    name: pauta.titulo,
-    description: pauta.subtitulo,
-    thumbnailUrl: [pauta.imagem.url],
-    uploadDate: pauta.dataISO,
-    contentUrl: pauta.videoUrl,
-    embedUrl: pauta.videoUrl,
-  });
-}
-
 const getYoutubeId = (url?: string) => {
   if (!url) return null;
   const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : null;
 };
+const isSafeMediaUrl = (url?: string): boolean => {
+  if (!url) return false;
+  const trimmed = url.trim();
+  return trimmed.startsWith('https://') || (trimmed.startsWith('/') && !trimmed.startsWith('//'));
+};
 const youtubeId = getYoutubeId(pauta.videoUrl);
+const safeVideoUrl = isSafeMediaUrl(pauta.videoUrl) ? pauta.videoUrl : undefined;
+
+if (safeVideoUrl) {
+  graph.push({
+    '@type': 'VideoObject',
+    name: pauta.titulo,
+    description: pauta.subtitulo,
+    thumbnailUrl: youtubeId
+      ? [`https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`, pauta.imagem.url]
+      : [pauta.imagem.url],
+    uploadDate: pauta.dataISO,
+    contentUrl: youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : safeVideoUrl,
+    embedUrl: youtubeId ? `https://www.youtube-nocookie.com/embed/${youtubeId}` : safeVideoUrl,
+  });
+}
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -427,7 +435,7 @@ const jsonLd = {
 
       <!-- Body Copy -->
       <div id="article-body" class="editorial-prose mt-10 text-[var(--color-ink)] dark:text-[var(--color-dark-ink)]">
-        {pauta.videoUrl && (
+        {safeVideoUrl && (
           <div class="mb-10 overflow-hidden rounded-2xl bg-black aspect-video">
             {youtubeId ? (
               <iframe
@@ -440,7 +448,7 @@ const jsonLd = {
               />
             ) : (
               <video
-                src={pauta.videoUrl}
+                src={safeVideoUrl}
                 poster={pauta.imagem.url}
                 controls
                 playsinline
@@ -455,6 +463,28 @@ const jsonLd = {
           <section id={section.heading ? `secao-${idx + 1}` : undefined} class="scroll-mt-24">
             {section.heading && <h2>{section.heading}</h2>}
             {section.paragraphs.map((p) => <p set:html={renderRichText(p)} />)}
+
+            {section.image?.url && isSafeMediaUrl(section.image.url) && (
+              <figure class="not-prose my-8">
+                <div class="overflow-hidden rounded-2xl bg-[var(--color-surface)] dark:bg-[var(--color-dark-surface)]">
+                  <img
+                    src={section.image.url}
+                    alt={section.image.alt || section.heading || pauta.titulo}
+                    title={section.image.caption || section.heading || pauta.titulo}
+                    width="1200"
+                    height="675"
+                    loading="lazy"
+                    decoding="async"
+                    class="aspect-[16/9] w-full object-cover"
+                  />
+                </div>
+                {(section.image.caption || section.image.credit) && (
+                  <figcaption class="mt-2.5 text-center text-[12px] leading-relaxed text-[var(--color-ink-subtle)] dark:text-[var(--color-dark-subtle)]">
+                    {section.image.caption || section.image.credit}
+                  </figcaption>
+                )}
+              </figure>
+            )}
 
             {section.subsections && section.subsections.map((sub) => (
               <div class="mt-6">

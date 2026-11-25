@@ -5,10 +5,18 @@ export interface PautaSubsection {
   paragraphs: string[];
 }
 
+export interface PautaSectionImage {
+  url: string;
+  alt: string;
+  caption?: string;
+  credit?: string;
+}
+
 export interface PautaSection {
   heading?: string;
   paragraphs: string[];
   subsections?: PautaSubsection[];
+  image?: PautaSectionImage;
   quote?: string;
   callout?: {
     label: string;
