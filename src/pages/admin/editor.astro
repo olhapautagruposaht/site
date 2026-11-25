@@ -1165,12 +1165,103 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
       }
     };
 
+    const TRENDS_CACHE_KEY = 'op_admin_trends_cache_v1';
+    const getTodayBrtKey = () => {
+      const shifted = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      return shifted.toISOString().slice(0, 10);
+    };
+
+    const loadTrendsCache = () => {
+      try {
+        const raw = localStorage.getItem(TRENDS_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed?.dateKey === getTodayBrtKey() && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          return parsed;
+        }
+      } catch {}
+      return null;
+    };
+
+    const saveTrendsCache = (cache) => {
+      try {
+        localStorage.setItem(TRENDS_CACHE_KEY, JSON.stringify(cache));
+      } catch {}
+    };
+
+    const renderTrendsList = (cache) => {
+      if (!cache || !Array.isArray(cache.items) || cache.items.length === 0) return;
+      const wrap = $('trends-wrap');
+      const list = $('trends-list');
+      const usedSet = new Set(Array.isArray(cache.usedIndexes) ? cache.usedIndexes : []);
+
+      $('trends-label').textContent = `${cache.items.length} pautas em alta hoje (${cache.webSearchUsed || 'cache'}) — salvas no seu navegador para não gastar busca de novo:`;
+      list.innerHTML = cache.items
+        .map((item, idx) => {
+          const isUsed = usedSet.has(idx);
+          return `
+          <div class="flex flex-col justify-between rounded-2xl border ${isUsed ? 'border-emerald-200 bg-emerald-50/40' : 'border-black/10 bg-[#F5F5F7]/70'} p-4 space-y-2.5">
+            <div>
+              <div class="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
+                <div class="flex items-center gap-2">
+                  <span class="text-[#D92B2B]">${escHtml(item.trilha)}</span>
+                  <span class="rounded-full bg-black/5 px-2 py-0.5 text-black/60">${item.foco === 'search' ? 'Search / AIO' : 'Discover'}</span>
+                </div>
+                ${isUsed ? '<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">✓ Já gerada</span>' : ''}
+              </div>
+              <p class="mt-1.5 text-xs font-bold leading-snug text-[#1D1D1F]">${escHtml(item.titulo)}</p>
+              <p class="mt-1 text-[11px] leading-relaxed text-black/65">${escHtml(item.angulo)}</p>
+              <p class="mt-1 text-[10px] text-black/45">${escHtml(item.motivo)}</p>
+            </div>
+            <button
+              type="button"
+              data-pick-trend="${idx}"
+              class="w-full rounded-xl ${isUsed ? 'border border-black/15 bg-white text-[#1D1D1F] hover:bg-black/5' : 'bg-[#1D1D1F] text-white hover:opacity-90'} px-3 py-2 text-xs font-semibold cursor-pointer"
+            >
+              ${isUsed ? '↻ Gerar novamente' : '⚡ Criar esta pauta (1 clique)'}
+            </button>
+          </div>
+        `;
+        })
+        .join('');
+      wrap.classList.remove('hidden');
+
+      list.querySelectorAll('[data-pick-trend]').forEach((pickBtn) => {
+        pickBtn.addEventListener('click', () => {
+          const idx = Number(pickBtn.dataset.pickTrend);
+          const chosen = cache.items[idx];
+          if (!chosen) return;
+          const nextUsed = Array.from(new Set([...(cache.usedIndexes || []), idx]));
+          const updatedCache = { ...cache, usedIndexes: nextUsed };
+          saveTrendsCache(updatedCache);
+
+          $('f-trilha').value = chosen.trilha;
+          $('ai-foco').value = chosen.foco;
+          $('ai-topic').value = `${chosen.titulo}. ${chosen.angulo}`;
+          if (chosen.source_urls?.length) $('ai-sources').value = chosen.source_urls.join(', ');
+          runFullGeneration({
+            topic: `${chosen.titulo}. ${chosen.angulo}`,
+            trilha: chosen.trilha,
+            foco: chosen.foco,
+            sourceUrls: chosen.source_urls || [],
+            triggerBtn: pickBtn,
+          }).then(() => {
+            renderTrendsList(updatedCache);
+          });
+        });
+      });
+    };
+
+    // Restaura automaticamente as pautas pesquisadas hoje (evita gastar Tavily/IA de novo após publicar ou recarregar)
+    const cachedTrendsToday = loadTrendsCache();
+    if (cachedTrendsToday) {
+      renderTrendsList(cachedTrendsToday);
+    }
+
     // 1-Click Discover Trending Topics Today
     $('btn-discover-trends').addEventListener('click', async () => {
       const btn = $('btn-discover-trends');
       const st = $('ai-status');
-      const wrap = $('trends-wrap');
-      const list = $('trends-list');
       btn.disabled = true;
       btn.textContent = 'Pesquisando tendências de hoje...';
       st.textContent = 'Buscando o que está em alta hoje em IA, Tecnologia, Segurança e Negócios na linha editorial do OlhaPauta...';
@@ -1188,50 +1279,15 @@ const rhythm = getEditorialRhythmMetrics(allScheduleRows);
         const items = data.suggestions || [];
         if (items.length === 0) throw new Error('Nenhuma sugestão retornada. Tente novamente.');
 
-        $('trends-label').textContent = `5 pautas em alta hoje (${data.webSearchUsed}) — clique em uma para gerar completa:`;
-        list.innerHTML = items
-          .map(
-            (item, idx) => `
-          <div class="flex flex-col justify-between rounded-2xl border border-black/10 bg-[#F5F5F7]/70 p-4 space-y-2.5">
-            <div>
-              <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                <span class="text-[#D92B2B]">${escHtml(item.trilha)}</span>
-                <span class="rounded-full bg-black/5 px-2 py-0.5 text-black/60">${item.foco === 'search' ? 'Search / AIO' : 'Discover'}</span>
-              </div>
-              <p class="mt-1.5 text-xs font-bold leading-snug text-[#1D1D1F]">${escHtml(item.titulo)}</p>
-              <p class="mt-1 text-[11px] leading-relaxed text-black/65">${escHtml(item.angulo)}</p>
-              <p class="mt-1 text-[10px] text-black/45">${escHtml(item.motivo)}</p>
-            </div>
-            <button
-              type="button"
-              data-pick-trend="${idx}"
-              class="w-full rounded-xl bg-[#1D1D1F] px-3 py-2 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
-            >
-              ⚡ Criar esta pauta (1 clique)
-            </button>
-          </div>
-        `
-          )
-          .join('');
-        wrap.classList.remove('hidden');
+        const freshCache = {
+          dateKey: getTodayBrtKey(),
+          webSearchUsed: data.webSearchUsed || 'tavily',
+          items,
+          usedIndexes: [],
+        };
+        saveTrendsCache(freshCache);
+        renderTrendsList(freshCache);
         st.classList.add('hidden');
-
-        list.querySelectorAll('[data-pick-trend]').forEach((pickBtn) => {
-          pickBtn.addEventListener('click', () => {
-            const chosen = items[Number(pickBtn.dataset.pickTrend)];
-            $('f-trilha').value = chosen.trilha;
-            $('ai-foco').value = chosen.foco;
-            $('ai-topic').value = `${chosen.titulo}. ${chosen.angulo}`;
-            if (chosen.source_urls?.length) $('ai-sources').value = chosen.source_urls.join(', ');
-            runFullGeneration({
-              topic: `${chosen.titulo}. ${chosen.angulo}`,
-              trilha: chosen.trilha,
-              foco: chosen.foco,
-              sourceUrls: chosen.source_urls || [],
-              triggerBtn: pickBtn,
-            });
-          });
-        });
       } catch (err) {
         st.textContent = err.message || 'Erro ao pesquisar tendências.';
         st.className = 'rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800';
